@@ -3,483 +3,481 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e5a45">
-<meta name="description" content="Lottery draw statistics, strategy backtesting against chance, and ticket generation.">
+<meta name="theme-color" content="#111113">
+<meta name="description" content="The honest lottery app: real odds, strategies tested against chance, prize-sharing scores, ticket checker and budget tracker.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>Lottery Draw Lab</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
-:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-body{margin:0} img{max-width:100%} [hidden]{display:none!important}
-
-/* Layout: a draw-office workbench — sticky game bar, five tabs, each tab a stack of panels; balls carry the colour code of the game */
+/* One dark look: black ground, red accent, Mark Six ball colours. Phone-width column, bottom tab bar. */
 :root{
-  --paper:#eef2f0; --surface:#ffffff; --ink:#14211d; --muted:#5a6a65; --line:#d3dcd8; --felt:#0e5a45; --felt-ink:#ffffff; --tint:#e2ece8;
-  --ball-red:#cf3239; --ball-blue:#2b62c6; --ball-green:#1d9452;
-  --s-random:#7d8b87; --s-hot:#c4502f; --s-cold:#2c6cc4; --s-overdue:#9a6a00; --s-mix:#7a4bbd;
-  --good:#1d7a4a; --warn:#a15c00;
-  --f-display:"Bricolage Grotesque", "Arial Narrow", system-ui, sans-serif;
-  --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --bg:#0b0b0c; --bar:#111113; --card:#17171a; --card2:#0f0f11; --line:#2a2a2e; --line2:#232327; --line3:#3a3a3f;
+  --ink:#f5f2f2; --muted:#a8a1a3; --red:#e3222f; --red-deep:#b80f1b; --red-ink:#ff5a63; --red-soft:#ffd6d8;
+  --warn-bg:#2a1214; --warn-line:#4a1a1e; --good:#4fd38c; --good-bg:#1f5e3d; --mid-bg:#5c4712; --bad-bg:#6e1a20;
+  --b-red:#cf3239; --b-blue:#2b62c6; --b-green:#1d9452;
+  --f-display:"Bricolage Grotesque","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --paper:#0d1412; --surface:#151f1c; --ink:#e4ece8; --muted:#93a39e; --line:#2a3733; --felt:#3fbf8f; --felt-ink:#06120e; --tint:#1b2a25;
-  --ball-red:#d8444b; --ball-blue:#3c74d6; --ball-green:#24a35e;
-  --s-random:#8f9d99; --s-hot:#ef7a58; --s-cold:#6ea2ee; --s-overdue:#d6a640; --s-mix:#b08ae8;
-  --good:#4fc98a; --warn:#e3a246; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --paper:#0d1412; --surface:#151f1c; --ink:#e4ece8; --muted:#93a39e; --line:#2a3733; --felt:#3fbf8f; --felt-ink:#06120e; --tint:#1b2a25;
-  --ball-red:#d8444b; --ball-blue:#3c74d6; --ball-green:#24a35e;
-  --s-random:#8f9d99; --s-hot:#ef7a58; --s-cold:#6ea2ee; --s-overdue:#d6a640; --s-mix:#b08ae8;
-  --good:#4fc98a; --warn:#e3a246; color-scheme:dark}
-
 *{box-sizing:border-box}
-body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
-.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
-h1{font-size:1.55rem;font-weight:800;letter-spacing:-.01em}
-h2{font-size:1.2rem;font-weight:700}
-h3{font-size:1rem;font-weight:600}
-p{margin:0}
-.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.muted{color:var(--muted)}
-.label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-
-.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
-.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding-block:12px}
-.brand{display:flex;align-items:center;gap:10px;margin-right:auto}
-.brand .mark{display:flex;gap:3px}
-.brand .mark i{width:12px;height:12px;border-radius:50%;display:block}
-.ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-select,input[type=number],textarea,button{font:inherit;color:var(--ink)}
-select,input[type=number]{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
-input[type=number]{width:74px}
-button{cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);padding:7px 14px;font-weight:500}
-button.primary{background:var(--felt);color:var(--felt-ink);border-color:var(--felt);font-weight:600}
-button:hover{border-color:var(--felt)}
-:focus-visible{outline:2px solid var(--felt);outline-offset:2px}
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;padding:3px 10px;border-radius:999px;background:var(--tint);color:var(--ink);font-weight:500}
-.pill.sample{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}
-
-nav.tabs{border-bottom:1px solid var(--line);background:var(--paper)}
-nav.tabs .wrap{display:flex;gap:4px;overflow-x:auto}
-nav.tabs a{padding:12px 14px;color:var(--muted);text-decoration:none;font-weight:500;white-space:nowrap;border-bottom:2px solid transparent}
-nav.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--felt)}
-
-main.wrap{padding-block:22px 60px;display:grid;gap:18px}
-.view{display:grid;gap:18px}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:grid;gap:14px;min-width:0}
-.panel header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px}
-.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.kpi{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
-.kpi .v{font-family:var(--f-mono);font-size:1.35rem;font-weight:600;font-variant-numeric:tabular-nums}
-.kpi .s{font-size:.8rem;color:var(--muted)}
-
-.balls{display:flex;flex-wrap:wrap;gap:6px}
-.ball{width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;font-family:var(--f-mono);font-weight:600;font-size:.88rem;color:#fff;flex:none;background:var(--ball-green);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
-.ball.red{background:var(--ball-red)}.ball.blue{background:var(--ball-blue)}.ball.green{background:var(--ball-green)}
-.ball.sm{width:26px;height:26px;font-size:.74rem}
-.chip{display:grid;justify-items:center;gap:2px;font-size:.72rem;color:var(--muted);font-family:var(--f-mono)}
-
-.chart{overflow-x:auto}
-.chart svg{display:block;width:100%;height:auto;min-width:520px}
-.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
-.chart .axis{stroke:var(--line)}
-.chart .grid{stroke:var(--line);stroke-dasharray:2 3}
-.chart .exp{stroke:var(--ink);stroke-width:1.2;stroke-dasharray:5 4}
-.chart .band{fill:var(--tint)}
-.chart .bar{fill:var(--felt)}
-.chart .bar.hi{fill:var(--s-hot)}.chart .bar.lo{fill:var(--s-cold)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.84rem}
-.legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
-
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--red-ink)}
+:focus-visible{outline:2px solid var(--red-ink);outline-offset:2px}
+.app{position:relative;max-width:480px;margin:0 auto;min-height:100dvh;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));overflow:hidden}
+.deco{position:absolute;inset:0;pointer-events:none;z-index:0}
+.top{position:sticky;top:0;z-index:5;background:var(--bar);border-bottom:1px solid var(--line);padding:calc(14px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:10px}
+.top .titles{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+h1,h2{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.2}
+h1{font-size:22px;font-weight:800;letter-spacing:-.01em}
+h2{font-size:16px;font-weight:600}
+.sub{font-size:13px;color:var(--muted);margin:0}
+main{position:relative;z-index:1;padding:16px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.card{background:rgba(23,23,26,.94);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card.flush{padding:4px 16px}
+.hero{position:relative;overflow:hidden;background:var(--red-deep);color:#fff;border-radius:20px;padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.hero>*{position:relative}
+.hero .ring{position:absolute;right:-40px;top:-50px;opacity:.18;pointer-events:none}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:var(--muted)}
+.hero .eyebrow,.hero .soft{color:var(--red-soft)}
+.big{font-family:var(--f-display);font-weight:800;font-size:38px;line-height:1}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.row{display:flex;align-items:center;gap:10px}
+.between{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.wrap{flex-wrap:wrap}
+.list>.item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--line2)}
+.list>.item:last-child{border-bottom:0}
+.item .t{display:flex;flex-direction:column;min-width:0}
+.item .s{font-size:12.5px;color:var(--muted)}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.tile{background:var(--card);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.tile .v{font-family:var(--f-mono);font-weight:600;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .s{font-size:12px;color:var(--muted)}
+.ball{width:40px;height:40px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-weight:600;font-size:15px;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);background:var(--b-green)}
+.ball.r{background:var(--b-red)}.ball.b{background:var(--b-blue)}.ball.g{background:var(--b-green)}
+.ball.md{width:34px;height:34px;font-size:13px}.ball.sm{width:31px;height:31px;font-size:12.5px}
+.ball.ringed{border:2px solid #fff}
+.ball.hit{box-shadow:0 0 0 2px var(--bg),0 0 0 4px #fff}
+.ball.miss{background:transparent;color:#8d8789;border:1.5px solid var(--line3);box-shadow:none}
+.balls{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.btn{height:48px;border-radius:14px;border:1px solid var(--line3);background:transparent;color:var(--ink);font-weight:500;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 16px;cursor:pointer;text-decoration:none}
+.btn.primary{background:var(--red);border-color:var(--red);color:#fff;font-weight:600}
+.btn.outline{border-color:var(--red);color:var(--red-ink);font-weight:600}
+.btn.block{width:100%}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.icon-btn{width:44px;height:44px;flex:none;border-radius:22px;border:1px solid var(--line3);background:var(--card);display:inline-flex;align-items:center;justify-content:center;color:var(--ink);cursor:pointer;text-decoration:none}
+.back{width:44px;height:44px;margin-left:-12px;display:flex;align-items:center;justify-content:center;color:var(--ink)}
+.pill{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:#26262a;color:#d9d2d4;white-space:nowrap}
+.pill.good{background:var(--good-bg);color:#c9f5dc}.pill.mid{background:var(--mid-bg);color:#ffe7a8}.pill.bad{background:var(--bad-bg);color:#ffd0d3}
+.pill.hero-pill{background:rgba(0,0,0,.28);color:#fff;font-weight:500}
+a.pill{text-decoration:none;min-width:44px;height:28px;display:inline-flex;align-items:center;justify-content:center}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;background:#1e1e22;border-radius:12px}
+.seg button{height:36px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:500;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--red);color:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line3);background:transparent;cursor:pointer;font-weight:500;font-size:14px}
+.chips button[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
+.stepper{display:flex;align-items:center;gap:4px;border:1px solid var(--line3);border-radius:12px;padding:2px}
+.stepper button{width:44px;height:40px;border:0;background:transparent;font-size:20px;font-weight:600;cursor:pointer}
+.stepper span{min-width:26px;text-align:center;font-family:var(--f-mono);font-weight:600}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--red);flex:none}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500;min-width:0}
+.field input,.field select,textarea{height:44px;border:1px solid var(--line3);border-radius:10px;padding:0 12px;background:var(--card2);color:var(--ink);font-family:var(--f-mono);font-size:15px;width:100%}
+textarea{height:150px;padding:10px;font-size:13px;resize:vertical}
+select.game{height:44px;border-radius:22px;border:1px solid var(--line3);background:var(--card);padding:0 12px;font-weight:500;font-size:14px;max-width:132px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:16px;background:rgba(42,18,20,.95);border:1px solid var(--warn-line);font-size:13.5px;color:#e9dfe0}
+.note p{margin:0}
+.bars{position:relative;height:120px;display:flex;align-items:flex-end;gap:1px;border-bottom:1px solid var(--line3)}
+.bars .band{position:absolute;left:0;right:0;background:#2a1517}
+.bars .exp{position:absolute;left:0;right:0;border-top:1.5px dashed var(--ink);z-index:1}
+.bars i{position:relative;flex:1 1 0;background:var(--red);border-radius:2px 2px 0 0;min-height:2px}
+.bars i.hi{background:#ff8a90}.bars i.lo{background:#6b6b70}
+.axis{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.track{position:relative;width:120px;height:24px;flex:none}
+.track .line{position:absolute;left:0;right:0;top:11px;height:2px;background:var(--line3)}
+.track .ok{position:absolute;left:20px;width:80px;top:4px;height:16px;border-radius:4px;background:#2a1517}
+.track .mid{position:absolute;left:59px;top:2px;width:2px;height:20px;background:var(--ink)}
+.track .dot{position:absolute;top:6px;width:12px;height:12px;border-radius:50%;border:2px solid var(--card)}
+.meter{position:relative;height:12px;display:flex;gap:3px}
+.meter span{flex:1}
+.meter .mark{position:absolute;top:-4px;width:4px;height:20px;margin-left:-2px;border-radius:2px;background:#fff}
+.progress{height:12px;border-radius:6px;background:rgba(0,0,0,.35);overflow:hidden}
+.progress>div{height:100%;border-radius:6px;background:#fff}
+.split{display:flex;height:14px;border-radius:7px;overflow:hidden;background:rgba(0,0,0,.35)}
+.tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:100%;max-width:480px;z-index:6;background:var(--bar);border-top:1px solid var(--line);padding:8px max(8px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.tabs a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;font-size:12px;font-weight:500;color:var(--muted);text-decoration:none}
+.tabs a span{width:56px;height:30px;border-radius:15px;display:flex;align-items:center;justify-content:center}
+.tabs a[aria-current="page"]{color:var(--red-ink);font-weight:600}
+.tabs a[aria-current="page"] span{background:#3d1418}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:7;background:#f5f2f2;color:#111;padding:10px 16px;border-radius:12px;font-weight:500;font-size:14px;max-width:min(440px,calc(100% - 32px));box-shadow:0 6px 24px rgba(0,0,0,.4)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line2);text-align:left}
+th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .tablebox{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.88rem}
-th,td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
-th:first-child,td:first-child{text-align:left}
-th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
-td{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-td.z-bad{color:var(--warn);font-weight:600}
-
-.verdict{border-left:4px solid var(--felt);background:var(--tint);padding:12px 16px;border-radius:0 8px 8px 0;max-width:72ch}
-.note{font-size:.86rem;color:var(--muted);max-width:72ch}
-.tickets{display:grid;gap:10px}
-.ticket{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 12px;border:1px dashed var(--line);border-radius:8px}
-.ticket .idx{font-family:var(--f-mono);color:var(--muted);width:2.2em}
-.ticket .why{font-size:.78rem;color:var(--muted);margin-left:auto}
-textarea{width:100%;min-height:170px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;font-family:var(--f-mono);font-size:.84rem}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.status{font-size:.86rem}
-.status.err{color:var(--ball-red)}.status.ok{color:var(--good)}
-.tabs a:focus-visible{outline-offset:-2px}
-@media (prefers-reduced-motion:no-preference){.ball{transition:transform .15s}.ticket:hover .ball{transform:translateY(-2px)}}
+.foot{font-size:12px;color:var(--muted);text-align:center;padding:0 16px 8px}
+.foot a{color:inherit}
+@media (prefers-reduced-motion:no-preference){.btn,.chips button,.seg button{transition:background .15s,border-color .15s}}
 </style>
 </head>
 <body>
-<header class="top"><div class="wrap">
-  <div class="brand">
-    <span class="mark" aria-hidden="true"><i style="background:var(--ball-red)"></i><i style="background:var(--ball-blue)"></i><i style="background:var(--ball-green)"></i></span>
-    <h1>Lottery Draw Lab</h1>
-  </div>
-  <div class="ctrl">
-    <label class="label" for="game">Game</label>
-    <select id="game">
-      <option value="marksix">Mark Six (HK) · 6 of 49</option>
-      <option value="uk">UK Lotto · 6 of 59</option>
-      <option value="euro">EuroMillions main · 5 of 50</option>
-      <option value="pb">Powerball white · 5 of 69</option>
-      <option value="custom">Custom…</option>
-    </select>
-    <span id="customBox" class="ctrl" hidden>
-      <input id="ck" type="number" min="2" max="10" value="6" aria-label="Numbers per draw"> of
-      <input id="cn" type="number" min="10" max="99" value="49" aria-label="Pool size">
-    </span>
-    <span id="srcPill" class="pill"></span>
-  </div>
-</div></header>
-
-<nav class="tabs" aria-label="Sections"><div class="wrap">
-  <a href="#overview">Overview</a>
-  <a href="#backtest">Strategy backtest</a>
-  <a href="#generate">Generate tickets</a>
-  <a href="#odds">Odds</a>
-  <a href="#data">Draw history</a>
-</div></nav>
-
-<main class="wrap">
-
-<!-- OVERVIEW -->
-<section class="view" id="v-overview">
-  <div class="kpis" id="kpis"></div>
-  <div class="panel">
-    <header><h2>How often each number has been drawn</h2><span class="note" id="freqNote"></span></header>
-    <div class="chart" id="freqChart"></div>
-    <div class="legend">
-      <span><i style="background:var(--felt)"></i>Within normal range</span>
-      <span><i style="background:var(--s-hot)"></i>Above 2σ</span>
-      <span><i style="background:var(--s-cold)"></i>Below 2σ</span>
-      <span><i style="background:var(--ink)"></i>Expected count</span>
-      <span><i style="background:var(--tint);height:10px"></i>±2σ band</span>
-    </div>
-  </div>
-  <div class="grid2">
-    <div class="panel">
-      <header><h3>Hot in the last <span class="win">100</span> draws</h3></header>
-      <div class="balls" id="hotList"></div>
-      <h3>Cold in the last <span class="win">100</span> draws</h3>
-      <div class="balls" id="coldList"></div>
-      <p class="note" id="hcNote"></p>
-    </div>
-    <div class="panel">
-      <header><h3>Longest current gaps</h3><span class="note" id="gapNote"></span></header>
-      <div class="balls" id="gapList"></div>
-      <p class="note">A number that has not appeared for many draws is no more likely to appear next. Each draw starts fresh.</p>
-    </div>
-  </div>
-  <div class="panel">
-    <header><h3>Latest draws</h3></header>
-    <div class="tablebox"><table id="recentTable"></table></div>
-  </div>
-</section>
-
-<!-- BACKTEST -->
-<section class="view" id="v-backtest" hidden>
-  <div class="panel">
-    <header><h2>Walk-forward backtest</h2>
-      <div class="row">
-        <label class="label" for="win">Look-back window</label><input id="win" type="number" min="10" max="1000" value="100">
-        <label class="label" for="warm">Warm-up draws</label><input id="warm" type="number" min="10" max="1000" value="50">
-        <button id="rerun">Re-run</button>
-      </div>
-    </header>
-    <p class="note">For every draw after the warm-up, each strategy picks one ticket using only the draws before it. We then count how many numbers it matched and compare that with pure chance.</p>
-    <div class="verdict" id="verdict"></div>
-    <div class="tablebox"><table id="btTable"></table></div>
-  </div>
-  <div class="panel">
-    <header><h3>Matches gained or lost against chance, over time</h3></header>
-    <div class="chart" id="cumChart"></div>
-    <div class="legend" id="cumLegend"></div>
-    <p class="note">The shaded funnel is where 95% of purely random ticket sequences end up. Lines wandering inside it are behaving exactly like luck.</p>
-  </div>
-  <div class="panel">
-    <header><h3>How many numbers each ticket matched</h3></header>
-    <div class="tablebox"><table id="distTable"></table></div>
-  </div>
-</section>
-
-<!-- GENERATE -->
-<section class="view" id="v-generate" hidden>
-  <div class="panel">
-    <header><h2>Generate tickets</h2></header>
-    <div class="row">
-      <label class="label" for="gStrat">Strategy</label>
-      <select id="gStrat">
-        <option value="random">Random (quick pick)</option>
-        <option value="hot">Lean hot</option>
-        <option value="cold">Lean cold</option>
-        <option value="overdue">Lean overdue</option>
-        <option value="mix">Hot + cold mix</option>
-      </select>
-      <label class="label" for="gCount">Tickets</label><input id="gCount" type="number" min="1" max="20" value="5">
-      <label class="row" style="gap:6px"><input id="gAvoid" type="checkbox" checked> Avoid popular patterns</label>
-      <button class="primary" id="gen">Generate</button>
-      <button id="copy">Copy</button>
-    </div>
-    <div class="tickets" id="tickets"></div>
-    <p class="status" id="copyStatus" aria-live="polite"></p>
-  </div>
-  <div class="panel">
-    <h3>What actually helps</h3>
-    <p class="note">No strategy changes the chance of winning; every ticket has the same odds. What you can change is how many people you would share a prize with. Many players pick birthdays (1–31), runs like 1-2-3, and neat patterns. "Avoid popular patterns" rejects tickets that use only numbers up to 31, contain three or more consecutive numbers, or form an even step sequence. In pari-mutuel games this raises your average payout if you do win.</p>
-    <p class="note">Set a spending limit before you play and treat tickets as entertainment, not income.</p>
-  </div>
-</section>
-
-<!-- ODDS -->
-<section class="view" id="v-odds" hidden>
-  <div class="panel">
-    <header><h2>Odds for one ticket</h2><span class="note" id="oddsNote"></span></header>
-    <div class="tablebox"><table id="oddsTable"></table></div>
-    <p class="note">These are exact hypergeometric probabilities. Historical data cannot move them for a fair draw machine, which is why every backtest above stays close to the expected column.</p>
-  </div>
-</section>
-
-<!-- DATA -->
-<section class="view" id="v-data" hidden>
-  <div class="panel">
-    <header><h2>Import your draw history</h2></header>
-    <p class="note">Paste rows or load a CSV. Each row needs a date (optional) and the main numbers, for example <span class="mono">2026-10-24, 3, 11, 19, 27, 38, 45</span>. Extra numbers such as a bonus ball are ignored: the first <span class="kOut">6</span> distinct numbers between 1 and <span class="nOut">49</span> are used.</p>
-    <textarea id="paste" placeholder="2026-10-21, 5, 12, 18, 30, 41, 47&#10;2026-10-24, 3, 11, 19, 27, 38, 45"></textarea>
-    <div class="row">
-      <input id="file" type="file" accept=".csv,.txt,text/csv,text/plain" aria-label="Choose CSV file">
-      <label class="row" style="gap:6px"><input id="newestFirst" type="checkbox"> Newest draw is listed first</label>
-    </div>
-    <div class="row">
-      <button class="primary" id="importBtn">Import draws</button>
-      <button id="sampleBtn">Use simulated sample</button>
-    </div>
-    <p class="status" id="importStatus" aria-live="polite"></p>
-  </div>
-  <div class="panel">
-    <header><h3>Loaded draws</h3><span class="note" id="loadedNote"></span></header>
-    <div class="tablebox"><table id="allTable"></table></div>
-  </div>
-</section>
-</main>
-<footer class="wrap" style="padding-block:0 32px;font-size:.82rem;color:var(--muted)">Statistics only. Lottery draws are random and cannot be predicted. 18+. <a href="privacy.html" style="color:inherit">Privacy policy</a></footer>
+<div class="app">
+  <svg class="deco" aria-hidden="true" viewBox="0 0 390 844" preserveAspectRatio="xMidYMin slice" width="100%" height="100%">
+    <g fill="none" stroke="#e3222f" stroke-width="2" opacity=".2">
+      <circle cx="356" cy="300" r="78"/><circle cx="356" cy="300" r="56"/>
+      <circle cx="26" cy="580" r="64"/><circle cx="26" cy="580" r="46"/>
+      <circle cx="362" cy="760" r="40"/>
+    </g>
+    <g fill="#e3222f" opacity=".2" font-family="IBM Plex Mono,monospace" font-weight="600" text-anchor="middle">
+      <text x="356" y="318" font-size="52">7</text><text x="26" y="596" font-size="44">21</text><text x="362" y="772" font-size="30">49</text>
+    </g>
+    <g fill="#e3222f" opacity=".32">
+      <path d="M300 190l4 10 10 4-10 4-4 10-4-10-10-4 10-4z"/><path d="M60 450l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/><path d="M210 700l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/>
+    </g>
+  </svg>
+  <div id="screen"></div>
+  <p class="foot">Statistics only. Draws are random and cannot be predicted. 18+. <a href="privacy.html">Privacy policy</a></p>
+</div>
+<nav class="tabs" aria-label="Main" id="tabs">
+  <a href="#home" data-tab="home"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg></span>Home</a>
+  <a href="#insights" data-tab="insights"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span>Insights</a>
+  <a href="#test" data-tab="test"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>Test</a>
+  <a href="#tickets" data-tab="tickets"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/></svg></span>Tickets</a>
+</nav>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const PRESETS={marksix:{k:6,N:49},uk:{k:6,N:59},euro:{k:5,N:50},pb:{k:5,N:69}};
-const STRATS=[
-  {id:'random',name:'Random',color:'var(--s-random)'},
-  {id:'hot',name:'Lean hot',color:'var(--s-hot)'},
-  {id:'cold',name:'Lean cold',color:'var(--s-cold)'},
-  {id:'overdue',name:'Lean overdue',color:'var(--s-overdue)'},
-  {id:'mix',name:'Hot + cold mix',color:'var(--s-mix)'}];
-const HK_RED=[1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46], HK_BLUE=[3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
+/* ================= constants & state ================= */
+const $=s=>document.querySelector(s);
+const GAMES={marksix:{name:'Mark Six',k:6,N:49,price:10,cur:'HK$'},uk:{name:'UK Lotto',k:6,N:59,price:2,cur:'£'},euro:{name:'EuroMillions',k:5,N:50,price:2.5,cur:'€'},pb:{name:'Powerball',k:5,N:69,price:2,cur:'$'}};
+const STRATS=[{id:'random',name:'Random',chip:'Random',color:'#9a9496'},{id:'hot',name:'Lean hot',chip:'Lean hot',color:'#ff7a55'},{id:'cold',name:'Lean cold',chip:'Lean cold',color:'#6ea2ee'},{id:'overdue',name:'Lean overdue',chip:'Overdue',color:'#e0b04a'},{id:'mix',name:'Hot + cold mix',chip:'Hot + cold',color:'#b98cf0'}];
+const HK_RED=[1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46],HK_BLUE=[3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
+const KEY='drawlab2';
+const S={game:'marksix',k:6,N:49,draws:[],source:'sample',win:100,warm:50,period:100,
+  groups:[],price:10,cur:'HK$',limit:200,remind:true,pauseOver:true,
+  syn:{name:'My syndicate',members:[{name:'You',paid:10}],prize:0},
+  gen:{strategy:'random',count:5,avoid:true,tickets:[]},scoreRef:null};
+function save(){try{const o={...S,draws:S.source==='sample'?[]:S.draws};delete o.scoreRef;localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
+function load(){try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o)Object.assign(S,o,{scoreRef:null})}catch(e){}}
 
-const S={preset:'marksix',k:6,N:49,draws:[],source:'sample',win:100,warm:50,tickets:[]};
-
-/* ---------- maths ---------- */
+/* ================= maths ================= */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function lgamma(z){const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
-  if(z<0.5)return Math.log(Math.PI/Math.sin(Math.PI*z))-lgamma(1-z);z-=1;let x=c[0];for(let i=1;i<9;i++)x+=c[i]/(z+i);const t=z+7.5;return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x)}
+function lgamma(z){const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];if(z<0.5)return Math.log(Math.PI/Math.sin(Math.PI*z))-lgamma(1-z);z-=1;let x=c[0];for(let i=1;i<9;i++)x+=c[i]/(z+i);const t=z+7.5;return 0.5*Math.log(2*Math.PI)+(z+0.5)*Math.log(t)-t+Math.log(x)}
 function lC(n,r){return r<0||r>n?-Infinity:lgamma(n+1)-lgamma(r+1)-lgamma(n-r+1)}
 function hyper(m,k,N){return Math.exp(lC(k,m)+lC(N-k,k-m)-lC(N,k))}
-function gammaP(a,x){if(x<=0)return 0;const lg=lgamma(a);
-  if(x<a+1){let ap=a,s=1/a,d=s;for(let i=0;i<1000;i++){ap++;d*=x/ap;s+=d;if(Math.abs(d)<Math.abs(s)*1e-14)break}return s*Math.exp(-x+a*Math.log(x)-lg)}
-  let b=x+1-a,c=1e300,d=1/b,h=d;for(let i=1;i<1000;i++){const an=-i*(i-a);b+=2;d=an*d+b;if(Math.abs(d)<1e-300)d=1e-300;c=b+an/c;if(Math.abs(c)<1e-300)c=1e-300;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<1e-14)break}
-  return 1-Math.exp(-x+a*Math.log(x)-lg)*h}
+function gammaP(a,x){if(x<=0)return 0;const lg=lgamma(a);if(x<a+1){let ap=a,s=1/a,d=s;for(let i=0;i<1000;i++){ap++;d*=x/ap;s+=d;if(Math.abs(d)<Math.abs(s)*1e-14)break}return s*Math.exp(-x+a*Math.log(x)-lg)}let b=x+1-a,c=1e300,d=1/b,h=d;for(let i=1;i<1000;i++){const an=-i*(i-a);b+=2;d=an*d+b;if(Math.abs(d)<1e-300)d=1e-300;c=b+an/c;if(Math.abs(c)<1e-300)c=1e-300;d=1/d;const del=d*c;h*=del;if(Math.abs(del-1)<1e-14)break}return 1-Math.exp(-x+a*Math.log(x)-lg)*h}
 function erfc(x){const z=Math.abs(x),t=1/(1+0.5*z);const r=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+t*(-0.82215223+t*0.17087277)))))))));return x>=0?r:2-r}
-function pTwo(z){return erfc(Math.abs(z)/Math.SQRT2)}
+const pTwo=z=>erfc(Math.abs(z)/Math.SQRT2);
 function sampleK(N,k,r){const a=Array.from({length:N},(_,i)=>i+1);for(let i=0;i<k;i++){const j=i+Math.floor(r()*(N-i));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,k).sort((x,y)=>x-y)}
-function weightedK(w,k,r,exclude=new Set()){const out=[];const ww=w.slice();exclude.forEach(x=>ww[x]=0);
-  for(let j=0;j<k;j++){let tot=0;for(let i=1;i<ww.length;i++)tot+=ww[i];let u=r()*tot,pick=1;
-    for(let i=1;i<ww.length;i++){u-=ww[i];if(u<=0&&ww[i]>0){pick=i;break}pick=ww[i]>0?i:pick}
-    out.push(pick);ww[pick]=0}return out}
+function weightedK(w,k,r,ex=new Set()){const out=[],ww=w.slice();ex.forEach(x=>ww[x]=0);for(let j=0;j<k;j++){let tot=0;for(let i=1;i<ww.length;i++)tot+=ww[i];let u=r()*tot,pick=-1;for(let i=1;i<ww.length;i++){if(ww[i]<=0)continue;pick=i;u-=ww[i];if(u<=0)break}out.push(pick);ww[pick]=0}return out}
+function pickTicket(id,{k,N,cnt,last,t},r){if(id==='random')return sampleK(N,k,r);
+  const hot=[0],cold=[0];let cmax=0;for(let i=1;i<=N;i++)cmax=Math.max(cmax,cnt[i]);for(let i=1;i<=N;i++){hot[i]=(cnt[i]+0.5)**2;cold[i]=(cmax-cnt[i]+0.5)**2}
+  const srt=a=>a.sort((x,y)=>x-y);
+  if(id==='hot')return srt(weightedK(hot,k,r));if(id==='cold')return srt(weightedK(cold,k,r));
+  if(id==='overdue'){const w=[0];for(let i=1;i<=N;i++)w[i]=((last[i]<0?t+1:t-last[i])+1)**1.5;return srt(weightedK(w,k,r))}
+  const h=weightedK(hot,Math.ceil(k/2),r);return srt(h.concat(weightedK(cold,k-h.length,r,new Set(h))))}
 
-/* ---------- strategies: weights built only from past draws ---------- */
-function pickTicket(id,ctx,r){const{k,N,cnt,last,t}=ctx;
-  if(id==='random')return sampleK(N,k,r);
-  const hot=[0],cold=[0];let cmax=0;for(let i=1;i<=N;i++)cmax=Math.max(cmax,cnt[i]);
-  for(let i=1;i<=N;i++){hot[i]=(cnt[i]+0.5)**2;cold[i]=(cmax-cnt[i]+0.5)**2}
-  if(id==='hot')return weightedK(hot,k,r).sort((a,b)=>a-b);
-  if(id==='cold')return weightedK(cold,k,r).sort((a,b)=>a-b);
-  if(id==='overdue'){const w=[0];for(let i=1;i<=N;i++)w[i]=((last[i]<0?t+1:t-last[i])+1)**1.5;return weightedK(w,k,r).sort((a,b)=>a-b)}
-  const h=weightedK(hot,Math.ceil(k/2),r);const c=weightedK(cold,k-h.length,r,new Set(h));return h.concat(c).sort((a,b)=>a-b)}
+/* ================= data helpers ================= */
+function loadSample(){const r=mulberry32(4900+S.k*100+S.N);const end=Date.UTC(2026,9,24),n=520;S.draws=[];
+  for(let i=0;i<n;i++){const d=new Date(end-(n-1-i)*3.5*864e5);S.draws.push({date:d.toISOString().slice(0,10),nums:sampleK(S.N,S.k,r)})}S.source='sample';btCache=null}
+const drawKey=d=>d?(d.date||'')+'|'+d.nums.join('-'):'';
+function ballCls(x){if(S.N===49)return HK_RED.includes(x)?'r':HK_BLUE.includes(x)?'b':'g';return['r','b','g'][Math.floor((x-1)/10)%3]}
+const ball=(x,extra='')=>`<span class="ball ${ballCls(x)} ${extra}">${x}</span>`;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtP=p=>p<0.0001?'< 0.0001':p.toFixed(p<0.01?4:p<0.1?3:2);
+const money=v=>`${S.cur} ${Number(v).toLocaleString(undefined,{maximumFractionDigits:2})}`;
+function fmtDate(iso){if(!iso)return'';const d=new Date(iso+'T00:00:00Z');if(isNaN(d))return esc(iso);return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'})}
+function oneIn(p){const v=1/p;return '1 in '+(v<10?v.toFixed(1):Math.round(v).toLocaleString())}
 
-function backtest(){const{draws,k,N,win,warm}=S;const r=mulberry32(20261027);
+function stats(period){const{draws,k,N}=S;const n=draws.length;const from=Math.max(0,n-period);const sub=draws.slice(from);const m=sub.length;
   const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);
-  const mu=k*k/N, v=k*(k/N)*((N-k)/N)*((N-k)/(N-1));
-  const res=STRATS.map(s=>({...s,hits:new Array(k+1).fill(0),total:0,n:0,cum:[]}));
-  for(let t=0;t<draws.length;t++){
-    if(t>=warm){const set=new Set(draws[t].nums);
-      for(const s of res){const tk=pickTicket(s.id,{k,N,cnt,last,t},r);let m=0;for(const x of tk)if(set.has(x))m++;
-        s.hits[m]++;s.total+=m;s.n++;s.cum.push(s.total-s.n*mu)}}
-    for(const x of draws[t].nums){cnt[x]++;last[x]=t}
-    if(t-win+1>=0&&t-win+1<t+1&&t-win>=0)for(const x of draws[t-win].nums)cnt[x]--;
-  }
-  for(const s of res){s.mean=s.n?s.total/s.n:0;s.z=s.n?(s.total-s.n*mu)/Math.sqrt(s.n*v):0;s.p=pTwo(s.z);
-    let p3=0;for(let m=3;m<=k;m++)p3+=s.hits[m];s.rate3=s.n?p3/s.n:0}
-  return{res,mu,v,T:res[0].n}}
+  sub.forEach(d=>d.nums.forEach(x=>cnt[x]++));draws.forEach((d,t)=>d.nums.forEach(x=>last[x]=t));
+  const p=k/N,E=m*p,sd=Math.sqrt(m*p*(1-p));let chi=0;for(let i=1;i<=N;i++)chi+=(cnt[i]-E)**2/(E||1);chi*=(N-1)/(N-k);
+  const pval=m?1-gammaP((N-1)/2,chi/2):1;
+  const rec=[];for(let i=1;i<=N;i++)rec.push({x:i,c:cnt[i],g:last[i]<0?n:n-1-last[i]});
+  return{m,cnt,E,sd,pval,hot:[...rec].sort((a,b)=>b.c-a.c||a.x-b.x).slice(0,6),cold:[...rec].sort((a,b)=>a.c-b.c||a.x-b.x).slice(0,6),gap:[...rec].sort((a,b)=>b.g-a.g||a.x-b.x)[0]}}
 
-/* ---------- stats ---------- */
-function stats(){const{draws,k,N,win}=S;const n=draws.length;
-  const cnt=new Array(N+1).fill(0),recent=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);
-  draws.forEach((d,t)=>{for(const x of d.nums){cnt[x]++;last[x]=t;if(t>=n-win)recent[x]++}});
-  const p=k/N,E=n*p,sd=Math.sqrt(n*p*(1-p));
-  let chi=0;for(let i=1;i<=N;i++)chi+=(cnt[i]-E)**2/E;
-  chi*= (N-1)/(N-k); // correct for fixed k numbers per draw
-  const pval=n?1-gammaP((N-1)/2,chi/2):1;
-  const gaps=[];for(let i=1;i<=N;i++)gaps.push({x:i,g:last[i]<0?n:n-1-last[i]});
-  gaps.sort((a,b)=>b.g-a.g||a.x-b.x);
-  const rec=[];for(let i=1;i<=N;i++)rec.push({x:i,c:recent[i]});
-  const hot=[...rec].sort((a,b)=>b.c-a.c||a.x-b.x).slice(0,8),cold=[...rec].sort((a,b)=>a.c-b.c||a.x-b.x).slice(0,8);
-  return{n,cnt,E,sd,chi,pval,gaps,hot,cold,last}}
+let btCache=null;
+function backtest(){const ck=[S.game,S.draws.length,drawKey(S.draws.at(-1)),S.win,S.warm].join();if(btCache&&btCache.ck===ck)return btCache;
+  const{draws,k,N,win,warm}=S;const r=mulberry32(20261027);const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);
+  const mu=k*k/N,v=k*(k/N)*((N-k)/N)*((N-k)/(N-1));const res=STRATS.map(s=>({...s,total:0,n:0}));
+  for(let t=0;t<draws.length;t++){if(t>=warm){const set=new Set(draws[t].nums);for(const s of res){const tk=pickTicket(s.id,{k,N,cnt,last,t},r);let m=0;for(const x of tk)if(set.has(x))m++;s.total+=m;s.n++}}
+    for(const x of draws[t].nums){cnt[x]++;last[x]=t}if(t-win>=0)for(const x of draws[t-win].nums)cnt[x]--}
+  for(const s of res){s.mean=s.n?s.total/s.n:0;s.z=s.n?(s.total-s.n*mu)/Math.sqrt(s.n*v):0;s.p=pTwo(s.z)}
+  btCache={ck,res,mu,T:res[0].n};return btCache}
 
-/* ---------- render helpers ---------- */
-function ballClass(x){if(S.N===49){return HK_RED.includes(x)?'red':HK_BLUE.includes(x)?'blue':'green'}return['red','blue','green'][Math.floor((x-1)/10)%3]}
-const ball=(x,sm)=>`<span class="ball ${ballClass(x)}${sm?' sm':''}">${x}</span>`;
-const fmt=(x,d=2)=>Number(x).toFixed(d);
-const pct=x=>(x*100).toFixed(x<0.001?3:x<0.1?2:1)+'%';
-function fmtP(p){return p<0.0001?'< 0.0001':p.toFixed(p<0.01?4:3)}
-function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+/* prize-sharing score: rule-based estimate of how popular a combination is */
+function crowdScore(t){const{N}=S;const last=S.draws.at(-1);const f=[];let s=0;
+  const b=t.filter(x=>x<=31).length;const bp=N>31?[0,0,0,10,25,45,65][Math.min(6,b+(6-t.length))]:0;s+=bp;
+  f.push({ok:bp<10,title:'Birthday numbers (1–31)',sub:`${b} of ${t.length}${bp>=10?', many players use only these':', a good mix'}`});
+  let pairs=0,run=1,maxRun=1;for(let i=1;i<t.length;i++){if(t[i]===t[i-1]+1){pairs++;run++;maxRun=Math.max(maxRun,run)}else run=1}
+  s+=pairs*10+(maxRun>=3?15:0);f.push({ok:pairs===0,title:pairs?`${pairs} consecutive pair${pairs>1?'s':''}`:'No runs like 21-22-23',sub:'Sequences are a common pick'});
+  const d=t[1]-t[0];const even=t.every((x,i)=>i===0||x-t[i-1]===d);const mult=[5,7].some(m=>t.every(x=>x%m===0));if(even||mult)s+=30;
+  f.push({ok:!(even||mult),title:even||mult?'Neat pattern':'No neat pattern',sub:'Even steps and multiples are popular'});
+  const ov=last?t.filter(x=>last.nums.includes(x)).length:0;s+=ov*6;
+  f.push({ok:ov===0,warn:ov>0&&ov<3,title:ov?`${ov} number${ov>1?'s':''} from the last draw`:'Nothing from the last draw',sub:'Some players repeat last result'});
+  s=Math.min(100,s);const level=s<35?'Low':s<65?'Medium':'High';return{s,level,cls:s<35?'good':s<65?'mid':'bad',f}}
+function lowerRisk(t){const{N,k}=S;if(N<=31)return t;const r=mulberry32((Date.now()^0x9e37)>>>0);let cur=t.slice();
+  for(let tries=0;tries<200&&crowdScore(cur).s>=35;tries++){const last=S.draws.at(-1)?.nums||[];
+    let idx=cur.findIndex((x,i)=>i>0&&x===cur[i-1]+1);if(idx<0)idx=cur.findIndex(x=>last.includes(x));if(idx<0)idx=cur.findIndex(x=>x<=31);if(idx<0)idx=Math.floor(r()*k);
+    let n;do{n=32+Math.floor(r()*(N-31))}while(cur.includes(n));cur[idx]=n;cur.sort((a,b)=>a-b)}return cur}
 
-function freqChart(st){const{N}=S,{cnt,E,sd}=st;const W=900,H=260,L=40,R=10,T=14,B=30;
-  const ymax=Math.max(E+2.5*sd,...cnt.slice(1))*1.05||1;const bw=(W-L-R)/N;const y=v=>T+(H-T-B)*(1-v/ymax);
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Frequency of each number">`;
-  const step=ymax>200?50:ymax>80?20:ymax>30?10:5;
-  for(let v=0;v<=ymax;v+=step)s+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
-  s+=`<rect class="band" x="${L}" width="${W-L-R}" y="${y(E+2*sd)}" height="${Math.max(0,y(Math.max(0,E-2*sd))-y(E+2*sd))}"/>`;
-  for(let i=1;i<=N;i++){const c=cnt[i],cls=c>E+2*sd?'hi':c<E-2*sd?'lo':'';const x=L+(i-1)*bw+bw*0.15;
-    s+=`<rect class="bar ${cls}" x="${x}" width="${bw*0.7}" y="${y(c)}" height="${y(0)-y(c)}"><title>${i}: drawn ${c} times</title></rect>`;
-    if(N<=50||i%2===1)s+=`<text x="${x+bw*0.35}" y="${H-B+14}" text-anchor="middle">${i}</text>`}
-  s+=`<line class="exp" x1="${L}" x2="${W-R}" y1="${y(E)}" y2="${y(E)}"/><line class="axis" x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}"/></svg>`;
-  return s}
+/* saved tickets & money */
+function myGroups(){return S.groups.filter(g=>g.game===S.game)}
+function resolve(g){const i=S.draws.findIndex(d=>drawKey(d)===g.after);if(g.after===''&&S.draws.length)return{state:'unknown'};if(i<0)return{state:'unknown'};const d=S.draws[i+1];return d?{state:'done',draw:d}:{state:'pending'}}
+function monthSpend(){const now=new Date();return S.groups.filter(g=>{const c=new Date(g.created);return c.getFullYear()===now.getFullYear()&&c.getMonth()===now.getMonth()}).reduce((a,g)=>a+g.tickets.length*g.price,0)}
+function yearTotals(){const y=new Date().getFullYear();let spent=0,won=0;S.groups.forEach(g=>{if(new Date(g.created).getFullYear()===y){spent+=g.tickets.length*g.price;won+=Number(g.won)||0}});return{spent,won}}
+function myRecord(){let checked=0,lost=0,hit=0;myGroups().forEach(g=>{const r=resolve(g);if(r.state!=='done')return;g.tickets.forEach(t=>{checked++;const m=t.filter(x=>r.draw.nums.includes(x)).length;if(m>=3)hit++;else lost++})});return{checked,lost,hit}}
 
-function cumChart(bt){const{res,v,T}=bt;const W=900,H=280,L=46,R=12,Tp=14,B=30;if(!T)return'<p class="note">Not enough draws after the warm-up.</p>';
-  let lim=2*Math.sqrt(T*v);for(const s of res)for(const c of s.cum)lim=Math.max(lim,Math.abs(c));lim*=1.08;
-  const x=i=>L+(W-L-R)*(i/(T-1||1)),y=c=>Tp+(H-Tp-B)*(0.5-c/(2*lim));
-  let s=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative matches versus chance">`;
-  let up='',dn='';for(let i=0;i<T;i+=Math.max(1,Math.floor(T/120))){const b=1.96*Math.sqrt((i+1)*v);up+=`${x(i)},${y(b)} `;dn=`${x(i)},${y(-b)} `+dn}
-  const bEnd=1.96*Math.sqrt(T*v);up+=`${x(T-1)},${y(bEnd)} `;dn=`${x(T-1)},${y(-bEnd)} `+dn;
-  s+=`<polygon class="band" points="${up}${dn}"/>`;
-  const tick=Math.pow(10,Math.floor(Math.log10(lim)));const st=lim/tick>5?tick*2:tick;
-  for(let c=-Math.floor(lim/st)*st;c<=lim;c+=st)s+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${y(c)}" y2="${y(c)}"/><text x="${L-6}" y="${y(c)+4}" text-anchor="end">${c>0?'+':''}${Math.round(c)}</text>`;
-  s+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${y(0)}" y2="${y(0)}"/>`;
-  for(const q of [0,0.25,0.5,0.75,1]){const i=Math.round(q*(T-1));s+=`<text x="${x(i)}" y="${H-8}" text-anchor="${q===0?'start':q===1?'end':'middle'}">ticket ${i+1}</text>`}
-  for(const r of res){let d='';const stp=Math.max(1,Math.floor(T/400));for(let i=0;i<T;i+=stp)d+=(d?'L':'M')+x(i).toFixed(1)+','+y(r.cum[i]).toFixed(1);d+='L'+x(T-1).toFixed(1)+','+y(r.cum[T-1]).toFixed(1);
-    s+=`<path d="${d}" fill="none" style="stroke:${r.color}" stroke-width="1.8" stroke-linejoin="round"/>`}
-  return s+'</svg>'}
+/* ================= screens ================= */
+const ICON={back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
+  info:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff5a63" stroke-width="2" aria-hidden="true" style="flex:none;margin-top:2px"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>',
+  chev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a8a1a3" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
+  ok:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4fd38c" stroke-width="2.4" aria-hidden="true" style="flex:none"><path d="M5 12l5 5 9-10"/></svg>',
+  warn:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e0b04a" stroke-width="2.4" aria-hidden="true" style="flex:none"><path d="M12 7v6M12 16.5v.5"/></svg>',
+  bad:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff5a63" stroke-width="2.4" aria-hidden="true" style="flex:none"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  ring:'<svg class="ring" width="160" height="160" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" fill="none" stroke="#fff" stroke-width="2"/><circle cx="80" cy="80" r="48" fill="none" stroke="#fff" stroke-width="2"/></svg>'};
+const top=(title,sub,{back,right=''}={})=>`<header class="top">${back?`<a class="back" href="#${back}" aria-label="Back">${ICON.back}</a>`:''}<div class="titles"><h1>${title}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${right}</header>`;
+const gameSelect=()=>`<label class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" for="gameSel">Game</label><select id="gameSel" class="game" data-chg="game">${Object.entries(GAMES).map(([id,g])=>`<option value="${id}" ${id===S.game?'selected':''}>${g.name}</option>`).join('')}</select>`;
 
-/* ---------- render views ---------- */
-function renderAll(){const{k,N}=S;$$('.kOut').forEach(e=>e.textContent=k);$$('.nOut').forEach(e=>e.textContent=N);$$('.win').forEach(e=>e.textContent=Math.min(S.win,S.draws.length));
-  $('#srcPill').className='pill'+(S.source==='sample'?' sample':'');
-  $('#srcPill').textContent=S.source==='sample'?`Simulated sample · ${S.draws.length} draws`:`Your data · ${S.draws.length} draws`;
-  renderOverview();renderBacktest();renderOdds();renderData();if(!S.tickets.length)generate();else renderTickets()}
+function vHome(){const{k,N}=S;const last=S.draws.at(-1);const st=stats(S.draws.length);
+  const p3=[...Array(k+1).keys()].filter(m=>m>=3).reduce((a,m)=>a+hyper(m,k,N),0);const per=Math.round(p3*1000);
+  const pend=myGroups().filter(g=>resolve(g).state==='pending');const tks=pend.flatMap(g=>g.tickets).slice(0,3);
+  const jack=Math.exp(lC(N,k));
+  return top('Draw Lab',`${GAMES[S.game].name} · ${k} of ${N}`,{right:`<a class="icon-btn" href="#budget" aria-label="Budget"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg></a>${gameSelect()}`})+
+  `<main>
+  <section class="hero">${ICON.ring}
+    <div class="between"><span class="eyebrow">Latest draw</span><span class="mono soft" style="font-size:13px">${last?fmtDate(last.date):''}</span></div>
+    <div class="balls">${last?last.nums.map(x=>ball(x,'ringed')).join(''):'<span class="soft">No draws loaded</span>'}</div>
+    <div class="between soft" style="font-size:13px"><a href="#data" style="color:#fff">${S.source==='sample'?'Load real results':'Update results'}</a><span class="pill hero-pill">${S.source==='sample'?'Sample data':'Your data'}</span></div>
+  </section>
+  <section class="tiles">
+    <a class="tile" href="#data" style="text-decoration:none;color:inherit"><span class="k">Draws</span><span class="v">${S.draws.length}</span><span class="s">analysed</span></a>
+    <a class="tile" href="#insights" style="text-decoration:none;color:inherit"><span class="k">Fairness</span><span class="v" style="color:${st.pval<0.01?'#ff8a90':'#4fd38c'}">${st.pval<0.01?'Check':'Fair'}</span><span class="s">p = ${fmtP(st.pval)}</span></a>
+    <a class="tile" href="#outcomes" style="text-decoration:none;color:inherit"><span class="k">Jackpot</span><span class="v">1 in ${jack>=1e6?(jack/1e6).toFixed(jack>=1e7?0:1)+'M':Math.round(jack).toLocaleString()}</span><span class="s">per ticket</span></a>
+  </section>
+  <section class="card">
+    <div class="between"><h2>My tickets for the next draw</h2><a href="#checker" style="font-size:14px;font-weight:500;text-decoration:none">Checker</a></div>
+    ${tks.length?tks.map(t=>`<div class="balls">${t.map(x=>ball(x,'sm')).join('')}</div>`).join(''):'<p class="sub">No tickets saved yet. Generate some and tap "Save & check later".</p>'}
+    <a class="btn primary block" href="#tickets"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Generate tickets</a>
+  </section>
+  <section class="note">${ICON.info}<div style="display:flex;flex-direction:column;gap:6px"><p>${1000-per} of every 1,000 tickets match 2 numbers or fewer. Play for fun and set a budget.</p><a href="#outcomes" style="font-size:14px;font-weight:600;text-decoration:none">See wins &amp; losses</a></div></section>
+  </main>`}
 
-function renderOverview(){const st=stats(),{k,N}=S;
-  const sig=st.pval<0.05;
-  $('#kpis').innerHTML=[
-    ['Draws analysed',st.n,S.draws.length?`${esc(S.draws[0].date||'#1')} → ${esc(S.draws.at(-1).date||'#'+st.n)}`:''],
-    ['Expected per number',fmt(st.E,1),`±${fmt(st.sd,1)} typical spread`],
-    ['Uniformity test',`p = ${fmtP(st.pval)}`,sig?'Counts look uneven: check the data':'Consistent with a fair draw'],
-    ['Jackpot odds','1 in '+Math.round(Math.exp(lC(N,k))).toLocaleString(),`${k} of ${N}`]
-  ].map(([l,v,s])=>`<div class="kpi"><span class="label">${l}</span><span class="v">${v}</span><span class="s">${s}</span></div>`).join('');
-  $('#freqNote').textContent=`χ² = ${fmt(st.chi,1)} on ${N-1} degrees of freedom`;
-  $('#freqChart').innerHTML=freqChart(st);
-  $('#hotList').innerHTML=st.hot.map(o=>`<span class="chip">${ball(o.x)}${o.c}×</span>`).join('');
-  $('#coldList').innerHTML=st.cold.map(o=>`<span class="chip">${ball(o.x)}${o.c}×</span>`).join('');
-  const wn=Math.min(S.win,st.n);$('#hcNote').textContent=`Expected about ${fmt(wn*k/N,1)} appearances each in ${wn} draws. Swings this size are normal.`;
-  $('#gapList').innerHTML=st.gaps.slice(0,10).map(o=>`<span class="chip">${ball(o.x)}${o.g} draws</span>`).join('');
-  $('#gapNote').textContent=`Average gap ≈ ${fmt(N/k,1)} draws`;
-  const recent=S.draws.slice(-8).reverse();
-  $('#recentTable').innerHTML=`<tr><th>Date</th><th style="text-align:left">Numbers</th></tr>`+recent.map(d=>`<tr><td>${esc(d.date||'—')}</td><td style="text-align:left"><div class="balls">${d.nums.map(x=>ball(x,1)).join('')}</div></td></tr>`).join('')}
+function vInsights(){const P=S.period>=S.draws.length?S.draws.length:S.period;const st=stats(P);const{N,k}=S;
+  const ymax=Math.max(st.E+2.5*st.sd,...st.cnt.slice(1))||1;const y=v=>Math.max(0,v/ymax*100);
+  const bars=st.cnt.slice(1).map((c,i)=>`<i class="${c>st.E+2*st.sd?'hi':c<st.E-2*st.sd?'lo':''}" style="height:${y(c)}%" title="${i+1}: ${c}"></i>`).join('');
+  const outside=st.cnt.slice(1).filter(c=>Math.abs(c-st.E)>2*st.sd).length;
+  const ticks=[1,10,20,30,40,N].filter((v,i,a)=>v<=N&&a.indexOf(v)===i);
+  return top('Number insights',`${GAMES[S.game].name} · ${S.source==='sample'?'sample data':'your data'}`)+`<main>
+  <div class="seg" role="group" aria-label="Period">${[[100,'Last 100'],[500,'Last 500'],[1e9,'All']].map(([v,l])=>`<button data-act="period" data-v="${v}" aria-pressed="${S.period===v}">${l}</button>`).join('')}</div>
+  <section class="card">
+    <div class="between"><h2>Times drawn, 1–${N}</h2><span class="mono" style="font-size:12px;color:var(--muted)">expected ${st.E.toFixed(1)}</span></div>
+    <div class="bars" role="img" aria-label="How often each number was drawn in the last ${st.m} draws">
+      <div class="band" style="bottom:${y(Math.max(0,st.E-2*st.sd))}%;height:${y(st.E+2*st.sd)-y(Math.max(0,st.E-2*st.sd))}%"></div>
+      <div class="exp" style="bottom:${y(st.E)}%"></div>${bars}</div>
+    <div class="axis">${ticks.map(t=>`<span>${t}</span>`).join('')}</div>
+    <p class="sub">${outside?`${outside} number${outside>1?'s':''} outside the shaded normal range, about ${Math.max(1,Math.round(N*0.05))} is typical by chance.`:'All numbers sit inside the normal range (shaded).'} Fairness test p = ${fmtP(st.pval)} over ${st.m} draws.</p>
+  </section>
+  <section class="card">
+    <h2 class="row"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff5a63" stroke-width="2" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 01-10 0c0-3 2-4 2-7 2 1 3 2 3 4"/></svg>Hot · drawn most</h2>
+    <div class="balls" style="gap:10px">${st.hot.map(o=>`<span class="chip">${ball(o.x,'md')}${o.c}×</span>`).join('')}</div>
+    <h2 class="row"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8fb8ff" stroke-width="2" aria-hidden="true"><path d="M12 2v20M4 6l16 12M20 6L4 18"/></svg>Cold · drawn least</h2>
+    <div class="balls" style="gap:10px">${st.cold.map(o=>`<span class="chip">${ball(o.x,'md')}${o.c}×</span>`).join('')}</div>
+    <p class="sub">About ${st.E.toFixed(0)} each is expected in ${st.m} draws. Gaps this size happen by chance.</p>
+  </section>
+  <section class="card"><div class="t" style="display:flex;flex-direction:column;gap:4px"><span class="row" style="font-weight:600">Longest gap: ${ball(st.gap.x,'sm')}</span><span class="sub">Not drawn for ${st.gap.g} draws · average gap is ${(N/k).toFixed(0)}. It is no more likely to come next.</span></div></section>
+  </main>`}
 
-let lastBT=null;
-function renderBacktest(){const bt=backtest();lastBT=bt;const{res,mu,T}=bt,{k,N}=S;
-  let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N);
-  const thr=0.05/(res.length-1);const beat=res.filter(r=>r.id!=='random'&&r.p<thr&&r.z>0);
-  const best=[...res].filter(r=>r.id!=='random').sort((a,b)=>b.z-a.z)[0];
-  $('#verdict').innerHTML=!T?'Load more draws to run the backtest.':beat.length
-    ?`<strong>${esc(beat.map(b=>b.name).join(', '))} beat chance at p &lt; ${fmt(thr,3)}.</strong> Re-check with more draws or a different window before trusting it; with fair machines this happens by luck about 5% of the time.`
-    :`<strong>No strategy beat random selection.</strong> Over ${T} tickets each, the best performer (${esc(best.name)}) averaged ${fmt(best.mean,3)} matches against ${fmt(mu,3)} expected (z = ${fmt(best.z)}, p = ${fmtP(best.p)}). That is what luck looks like.`;
-  $('#btTable').innerHTML=`<tr><th>Strategy</th><th>Tickets</th><th>Avg matches</th><th>Expected</th><th>3+ matches</th><th>Expected 3+</th><th>z-score</th><th>p-value</th></tr>`+
-    res.map(r=>`<tr><td><span class="legend"><span><i style="background:${r.color}"></i>${r.name}</span></span></td><td>${r.n}</td><td>${fmt(r.mean,3)}</td><td>${fmt(mu,3)}</td><td>${pct(r.rate3)}</td><td>${pct(p3)}</td><td class="${Math.abs(r.z)>2?'z-bad':''}">${r.z>0?'+':''}${fmt(r.z)}</td><td>${fmtP(r.p)}</td></tr>`).join('');
-  $('#cumChart').innerHTML=cumChart(bt);
-  $('#cumLegend').innerHTML=res.map(r=>`<span><i style="background:${r.color}"></i>${r.name}</span>`).join('')+'<span><i style="background:var(--tint);height:10px"></i>95% chance band</span>';
-  let h=`<tr><th>Matched</th><th>Chance</th>${res.map(r=>`<th>${r.name}</th>`).join('')}</tr>`;
-  for(let m=0;m<=k;m++)h+=`<tr><td>${m} of ${k}</td><td>${pct(hyper(m,k,N))}</td>${res.map(r=>`<td>${r.n?pct(r.hits[m]/r.n):'—'}</td>`).join('')}</tr>`;
-  $('#distTable').innerHTML=h}
+function vTest(){const bt=backtest();const{res,mu,T}=bt;const thr=0.05/(res.length-1);const beat=res.filter(r=>r.id!=='random'&&r.z>0&&r.p<thr);
+  return top('Strategy test',`Each strategy picked one ticket for ${T} past draws, using only earlier results.`)+`<main>
+  <section class="hero" style="gap:6px">${ICON.ring}
+    <span class="eyebrow">Verdict</span>
+    <p style="margin:0;font-family:var(--f-display);font-size:21px;font-weight:600;line-height:1.25">${!T?'Load more draws to run the test.':beat.length?`${esc(beat.map(b=>b.name).join(', '))} beat chance this time.`:'No strategy beat random picks.'}</p>
+    <p class="soft" style="margin:0;font-size:13.5px">${beat.length?'With fair draws this happens by luck now and then. Re-test with more draws.':'Every result sits inside the range luck alone produces.'}</p>
+  </section>
+  <section class="card flush" style="padding-bottom:10px">
+    <div class="between" style="padding:10px 0 6px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600"><span>Strategy · avg matches</span><span>vs chance</span></div>
+    <div class="list">${res.map(r=>{const left=60+Math.max(-3,Math.min(3,r.z))*20-6;return `<div class="item"><div class="t"><span style="font-weight:600">${r.name}</span><span class="mono s">${r.mean.toFixed(3)} · z ${r.z>0?'+':''}${r.z.toFixed(2)}</span></div><div class="track" role="img" aria-label="${r.name}: z-score ${r.z.toFixed(2)}"><div class="line"></div><div class="ok"></div><div class="mid"></div><div class="dot" style="left:${left}px;background:${r.color}"></div></div></div>`}).join('')}</div>
+    <div class="row" style="justify-content:flex-end;gap:14px;font-size:11.5px;color:var(--muted)"><span class="row" style="gap:5px"><span style="width:12px;height:10px;border-radius:3px;background:#2a1517;border:1px solid var(--warn-line)"></span>normal luck</span><span class="row" style="gap:5px"><span style="width:2px;height:12px;background:var(--ink)"></span>chance ${mu.toFixed(3)}</span></div>
+  </section>
+  <section class="card"><h2>Settings</h2>
+    <div class="grid2"><label class="field">Look-back window<input id="win" type="number" min="10" max="1000" value="${S.win}" data-chg="win"></label><label class="field">Warm-up draws<input id="warm" type="number" min="10" max="1000" value="${S.warm}" data-chg="warm"></label></div>
+    <button class="btn outline block" data-act="rerun">Run test again</button></section>
+  </main>`}
 
-function renderOdds(){const{k,N}=S;let h='<tr><th>Numbers matched</th><th>Probability</th><th>Odds</th></tr>';
-  for(let m=k;m>=0;m--){const p=hyper(m,k,N);h+=`<tr><td>${m} of ${k}</td><td>${pct(p)}</td><td>1 in ${p>0?(1/p<10?fmt(1/p,2):Math.round(1/p).toLocaleString()):'∞'}</td></tr>`}
-  $('#oddsTable').innerHTML=h;$('#oddsNote').textContent=`Expected matches per ticket: ${fmt(k*k/N,3)}`}
+function genTickets(){const{k,N,draws}=S;const g=S.gen;const r=mulberry32((Date.now()^(Math.random()*1e9))>>>0);
+  const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);const t=draws.length;draws.forEach((d,i)=>d.nums.forEach(x=>{last[x]=i;if(i>=t-S.win)cnt[x]++}));
+  const out=[],seen=new Set();for(let i=0;i<g.count;i++){let tk,n=0;do{tk=pickTicket(g.strategy,{k,N,cnt,last,t},r);n++}while(n<300&&((g.avoid&&crowdScore(tk).s>=35)||seen.has(tk.join())));seen.add(tk.join());out.push(tk)}g.tickets=out;save()}
+function vTickets(){const g=S.gen;if(!g.tickets.length||g.tickets[0].length!==S.k)genTickets();
+  return top('Tickets',`For ${GAMES[S.game].name}, next draw`)+`<main>
+  <section class="card">
+    <div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Strategy</span><div class="chips">${STRATS.map(s=>`<button data-act="strat" data-v="${s.id}" aria-pressed="${g.strategy===s.id}">${s.chip}</button>`).join('')}</div></div>
+    <div class="between"><span style="font-weight:500">Number of tickets</span><div class="stepper"><button aria-label="Fewer tickets" data-act="count" data-v="-1">−</button><span>${g.count}</span><button aria-label="More tickets" data-act="count" data-v="1">+</button></div></div>
+    <label class="between" style="cursor:pointer"><span style="display:flex;flex-direction:column"><span style="font-weight:500">Avoid popular patterns</span><span class="sub" style="font-size:12.5px">Fewer people to share a prize with</span></span><input id="avoid" type="checkbox" ${g.avoid?'checked':''} data-chg="avoid"></label>
+    <button class="btn primary block" data-act="generate">Generate tickets</button>
+  </section>
+  <section class="card flush">
+    <div class="list">${g.tickets.map((t,i)=>{const c=crowdScore(t);return `<div class="item" style="justify-content:flex-start"><span class="mono" style="font-size:12px;color:var(--muted);width:18px">${String(i+1).padStart(2,'0')}</span><div class="balls" style="gap:5px;flex:1;flex-wrap:nowrap">${t.map(x=>ball(x,'sm')).join('')}</div><a class="pill ${c.cls}" href="#score" data-act="score" data-v="${i}" aria-label="Prize-sharing risk ${c.level}, ${c.s} of 100. Open details">${c.level==='Medium'?'Med':c.level}</a></div>`}).join('')}</div>
+    <div class="row" style="padding:12px 0"><button class="btn" style="flex:1" data-act="copy">Copy</button><button class="btn outline" style="flex:1" data-act="saveTickets">Save &amp; check later</button></div>
+  </section>
+  <p class="sub" style="text-align:center">${money(S.price)} per ticket · ${money(S.price*g.count)} for this set · <a href="#budget">budget</a></p>
+  </main>`}
 
-function renderData(){const d=S.draws;$('#loadedNote').textContent=`${d.length} draws, oldest first${S.source==='sample'?' · simulated, not real results':''}`;
-  const rows=d.slice(-60).reverse();
-  $('#allTable').innerHTML=`<tr><th>#</th><th>Date</th><th style="text-align:left">Numbers</th></tr>`+rows.map((r,i)=>`<tr><td>${d.length-i}</td><td>${esc(r.date||'—')}</td><td style="text-align:left" class="mono">${r.nums.join(' · ')}</td></tr>`).join('')+(d.length>60?`<tr><td colspan="3" class="muted" style="text-align:left;font-family:var(--f-body)">Showing the latest 60 of ${d.length}.</td></tr>`:'')}
+function vScore(){if(!S.gen.tickets.length||S.gen.tickets[0].length!==S.k)genTickets();let t=S.scoreRef!=null?S.gen.tickets[S.scoreRef]:null;if(!t){t=S.gen.tickets[0]||sampleK(S.N,S.k,Math.random);S.scoreRef=0}
+  const c=crowdScore(t);const col={good:'#4fd38c',mid:'#e0b04a',bad:'#ff8a90'}[c.cls];
+  return top('Prize-sharing score','How many others might pick the same numbers',{back:'tickets'})+`<main>
+  <section class="card" style="border-radius:20px;gap:14px">
+    <div class="balls">${t.map(x=>ball(x)).join('')}</div>
+    <div class="between" style="align-items:flex-end"><div style="display:flex;flex-direction:column"><span class="eyebrow">Crowd risk</span><span style="font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1.1;color:${col}">${c.level}</span></div><span class="mono" style="font-weight:600;font-size:28px">${c.s}<span style="font-size:15px;color:var(--muted)">/100</span></span></div>
+    <div class="meter" role="img" aria-label="Score ${c.s} out of 100"><span style="flex:35;border-radius:6px 0 0 6px;background:#1f5e3d"></span><span style="flex:30;background:#6b5418"></span><span style="flex:35;border-radius:0 6px 6px 0;background:#6e1a20"></span><i class="mark" style="left:${c.s}%"></i></div>
+    <div class="between" style="font-size:11.5px;color:var(--muted)"><span>Low</span><span>Medium</span><span>High</span></div>
+  </section>
+  <section class="card flush"><div class="list">${c.f.map(f=>`<div class="item" style="justify-content:flex-start">${f.ok?ICON.ok:f.warn?ICON.warn:ICON.bad}<div class="t"><span>${f.title}</span><span class="s">${f.sub}</span></div></div>`).join('')}</div></section>
+  <section class="note">${ICON.info}<p>This score does not change your chance of winning. It lowers the chance of splitting a prize with many others.</p></section>
+  <div class="row"><a class="btn" style="flex:1" href="#tickets">Keep ticket</a><button class="btn primary" style="flex:1" data-act="lower" ${c.s<35?'disabled':''}>Lower the risk</button></div>
+  </main>`}
 
-/* ---------- generator ---------- */
-function popular(t,N){if(t.every(x=>x<=31)&&N>31)return true;let run=1;for(let i=1;i<t.length;i++){run=t[i]===t[i-1]+1?run+1:1;if(run>=3)return true}
-  const d=t[1]-t[0];if(t.every((x,i)=>i===0||x-t[i-1]===d))return true;return false}
-function generate(){const{k,N,draws}=S;const id=$('#gStrat').value,n=Math.max(1,Math.min(20,+$('#gCount').value||5)),avoid=$('#gAvoid').checked;
-  const r=mulberry32((Date.now()^(Math.random()*1e9))>>>0);
-  const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);const t=draws.length;
-  draws.forEach((d,i)=>{for(const x of d.nums){last[x]=i;if(i>=t-S.win)cnt[x]++}});
-  const out=[];const seen=new Set();
-  for(let i=0;i<n;i++){let tk,tries=0;do{tk=pickTicket(id,{k,N,cnt,last,t},r);tries++}while(tries<300&&((avoid&&popular(tk,N))||seen.has(tk.join())));seen.add(tk.join());out.push(tk)}
-  S.tickets=out;S.ticketStrat=id;renderTickets()}
-function renderTickets(){const name=(STRATS.find(s=>s.id===S.ticketStrat)||STRATS[0]).name;
-  $('#tickets').innerHTML=S.tickets.map((t,i)=>`<div class="ticket"><span class="idx">${String(i+1).padStart(2,'0')}</span><div class="balls">${t.map(x=>ball(x)).join('')}</div><span class="why">${name} · sum ${t.reduce((a,b)=>a+b,0)}</span></div>`).join('')}
+function vChecker(){const gs=myGroups().slice().reverse();const done=gs.map(g=>({g,r:resolve(g)}));
+  const latest=done.find(x=>x.r.state==='done');let sum='';
+  if(latest){const nums=latest.r.draw.nums;const ms=latest.g.tickets.map(t=>t.filter(x=>nums.includes(x)).length);
+    sum=`<section class="hero">${ICON.ring}<span class="eyebrow">Result · ${fmtDate(latest.r.draw.date)}</span><div class="balls">${nums.map(x=>ball(x,'ringed')).join('')}</div><div class="row wrap" style="gap:16px;font-size:13.5px"><span><b class="mono">${ms.length}</b> checked</span><span><b class="mono">${ms.filter(m=>m>=3).length}</b> matched 3+</span><span><b class="mono">${ms.filter(m=>m<3).length}</b> no prize</span></div></section>`}
+  const body=done.length?done.map(({g,r})=>{const nums=r.state==='done'?r.draw.nums:null;
+    return `<section class="card flush"><div class="between" style="padding:12px 0 4px"><span style="font-weight:600">${r.state==='done'?'Draw '+fmtDate(r.draw.date):r.state==='pending'?'Waiting for next draw':'Draw not in loaded history'}</span><span class="sub">${g.tickets.length} ticket${g.tickets.length>1?'s':''}</span></div>
+    <div class="list">${g.tickets.map((t,i)=>{const m=nums?t.filter(x=>nums.includes(x)).length:null;return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px"><div class="between"><span class="mono" style="font-size:12px;color:var(--muted)">Ticket ${i+1}</span>${m===null?'<span class="pill">Pending</span>':`<span class="pill ${m>=3?'good':''}">${m>=3?'Matched '+m:m===0?'No match':'Matched '+m+' · no prize'}</span>`}</div><div class="balls">${t.map(x=>ball(x,'md '+(nums?(nums.includes(x)?'hit':'miss'):''))).join('')}</div></div>`}).join('')}</div>
+    ${r.state==='done'?`<label class="between" style="padding:10px 0 12px;gap:12px"><span class="sub" style="font-size:13.5px">Prize won for this draw (${esc(S.cur)})</span><input type="number" min="0" step="any" value="${Number(g.won)||0}" data-chg="won" data-v="${g.id}" style="width:110px;height:40px;border:1px solid var(--line3);border-radius:10px;background:var(--card2);padding:0 10px;font-family:var(--f-mono)"></label>`:''}
+    <div style="padding-bottom:10px"><button class="btn" style="height:40px;font-size:13.5px" data-act="delGroup" data-v="${g.id}">Remove</button></div></section>`}).join(''):`<section class="card"><p class="sub">No saved tickets yet. On the Tickets screen tap "Save &amp; check later". They are checked automatically when the next result is added.</p><a class="btn primary" href="#tickets">Go to tickets</a></section>`;
+  return top('Ticket checker','Saved tickets against each new result',{back:'tickets'})+`<main>${sum}${body}
+  <section class="card"><h2>Add the latest result</h2><p class="sub">Enter the ${S.k} main numbers once the draw is out. Saved tickets are checked straight away.</p>
+    <div class="grid2"><label class="field">Draw date<input id="resDate" type="date"></label><label class="field">Numbers<input id="resNums" type="text" inputmode="numeric" placeholder="3 11 19 27 38 45"></label></div>
+    <button class="btn outline block" data-act="addResult">Add result</button>
+    <p class="sub" style="font-size:12.5px">Prize amounts depend on the operator's tiers. Confirm any win with the official result.</p></section>
+  </main>`}
 
-/* ---------- data import ---------- */
-const DATE_RE=/(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})/;
-function parse(text){const{k,N}=S;const out=[];let skipped=0;
-  for(const raw of text.split(/\r?\n/)){const line=raw.trim();if(!line)continue;const dm=line.match(DATE_RE);const date=dm?dm[1]:'';
-    const rest=dm?line.replace(dm[1],' '):line;const nums=[];for(const m of rest.matchAll(/\d+/g)){const v=+m[0];if(v>=1&&v<=N&&!nums.includes(v))nums.push(v);if(nums.length===k)break}
-    if(nums.length===k)out.push({date,nums:nums.sort((a,b)=>a-b)});else skipped++}
-  if($('#newestFirst').checked)out.reverse();return{out,skipped}}
-function save(){try{localStorage.setItem('drawlab',JSON.stringify({preset:S.preset,k:S.k,N:S.N,source:S.source,draws:S.source==='import'?S.draws:[]}))}catch(e){}}
-function loadSample(){S.draws=[];const r=mulberry32(4900+S.k*100+S.N);const end=Date.UTC(2026,9,24),n=520;
-  for(let i=0;i<n;i++){const d=new Date(end-(n-1-i)*3.5*864e5);S.draws.push({date:d.toISOString().slice(0,10),nums:sampleK(S.N,S.k,r)})}S.source='sample'}
+function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N);const per=Math.round(p3*1000);const me=myRecord();const yt=yearTotals();
+  const rows=[];for(let m=3;m<=k;m++)rows.push(`<div class="item"><span${m===k?' style="font-weight:600"':''}>${m===k?'Jackpot, all '+k:'Match '+m+' numbers'}</span><span class="mono" style="font-size:14px;color:${m===k?'var(--red-ink)':'var(--muted)'};font-weight:${m===k?600:400}">${oneIn(hyper(m,k,N))}</span></div>`);
+  return top('Wins &amp; losses',`What happens to ${GAMES[S.game].name} tickets`,{back:'home'})+`<main>
+  <section class="hero" style="gap:12px"><span class="eyebrow">Out of every 1,000 tickets</span>
+    <div class="row" style="gap:22px;align-items:baseline"><div style="display:flex;flex-direction:column"><span class="big">${1000-per}</span><span class="soft" style="font-size:13px">match 2 or fewer</span></div><div style="display:flex;flex-direction:column"><span class="big">${per}</span><span class="soft" style="font-size:13px">match 3 or more</span></div></div>
+    <div class="split" role="img" aria-label="${1000-per} of 1,000 match 2 or fewer; ${per} match 3 or more"><div style="width:${100-per/10}%;background:#2a0508"></div><div style="width:${per/10}%;min-width:6px;background:#fff"></div></div></section>
+  <section class="card flush"><div class="list">${rows.join('')}</div></section>
+  <section class="card"><h2>Your checked tickets</h2>
+    ${me.checked?`<div class="tiles"><div class="tile"><span class="k">Checked</span><span class="v">${me.checked}</span></div><div class="tile"><span class="k">Lost</span><span class="v" style="color:#ff8a90">${me.lost}</span></div><div class="tile"><span class="k">Matched 3+</span><span class="v" style="color:#4fd38c">${me.hit}</span></div></div>
+    <p class="sub">This year: spent ${money(yt.spent)}, won ${money(yt.won)}.</p>`:'<p class="sub">Save tickets and add results in the checker to see your own record here. It stays on this phone.</p>'}
+  </section></main>`}
 
-/* ---------- wiring ---------- */
-function setGame(){const v=$('#game').value;S.preset=v;$('#customBox').hidden=v!=='custom';
-  if(v==='custom'){S.k=Math.max(2,Math.min(10,+$('#ck').value||6));S.N=Math.max(S.k*2,Math.min(99,+$('#cn').value||49))}else{S.k=PRESETS[v].k;S.N=PRESETS[v].N}
-  loadSample();S.tickets=[];save();renderAll()}
-$('#game').addEventListener('change',setGame);$('#ck').addEventListener('change',setGame);$('#cn').addEventListener('change',setGame);
-$('#rerun').addEventListener('click',()=>{S.win=Math.max(10,+$('#win').value||100);S.warm=Math.max(10,+$('#warm').value||50);renderAll()});
-$('#gen').addEventListener('click',generate);
-$('#copy').addEventListener('click',()=>{const txt=S.tickets.map(t=>t.join(' ')).join('\n');const st=$('#copyStatus');
-  navigator.clipboard.writeText(txt).then(()=>{st.className='status ok';st.textContent='Copied tickets.'}).catch(()=>{st.className='status';st.textContent=txt})});
-$('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{$('#paste').value=rd.result};rd.readAsText(f)});
-$('#importBtn').addEventListener('click',()=>{const st=$('#importStatus');const{out,skipped}=parse($('#paste').value);
-  if(out.length<20){st.className='status err';st.textContent=`Found ${out.length} valid draws. Add at least 20 rows with ${S.k} numbers between 1 and ${S.N} each.`;return}
-  S.draws=out;S.source='import';S.tickets=[];save();renderAll();st.className='status ok';st.textContent=`Imported ${out.length} draws${skipped?`, skipped ${skipped} rows without ${S.k} valid numbers`:''}.`});
-$('#sampleBtn').addEventListener('click',()=>{loadSample();S.tickets=[];save();renderAll();const st=$('#importStatus');st.className='status ok';st.textContent='Loaded the simulated sample.'});
+function vBudget(){const sp=monthSpend();const pct=S.limit>0?Math.min(100,sp/S.limit*100):0;const yt=yearTotals();const net=yt.won-yt.spent;
+  const now=new Date();const reset=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const entries=S.groups.slice().reverse().slice(0,8);
+  return top('Budget','Spending against prizes',{back:'home'})+`<main>
+  <section class="hero">${ICON.ring}<div class="between"><span class="eyebrow">${now.toLocaleDateString('en-GB',{month:'long'})} limit</span><span class="mono soft" style="font-size:13px">${money(S.limit)}</span></div>
+    <div class="row" style="align-items:baseline;gap:8px"><span class="big" style="font-size:34px">${money(sp)}</span><span class="soft">spent</span></div>
+    <div class="progress" role="img" aria-label="${Math.round(pct)} percent of the monthly limit used"><div style="width:${pct}%;${pct>=100?'background:#ffd6d8':''}"></div></div>
+    <span style="font-size:13.5px">${sp>=S.limit?'Limit reached':money(S.limit-sp)+' left'} · resets ${reset}</span></section>
+  <section class="tiles"><div class="tile"><span class="k">Spent ${now.getFullYear()}</span><span class="v">${yt.spent.toLocaleString()}</span></div><div class="tile"><span class="k">Won ${now.getFullYear()}</span><span class="v" style="color:#4fd38c">${yt.won.toLocaleString()}</span></div><div class="tile"><span class="k">Net</span><span class="v" style="color:${net<0?'#ff8a90':'#4fd38c'}">${net<0?'−':''}${Math.abs(net).toLocaleString()}</span></div></section>
+  <section class="card flush"><div class="list">${entries.length?entries.map(g=>{const r=resolve(g);return `<div class="item"><div class="t"><span>${new Date(g.created).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${GAMES[g.game]?.name||''}</span><span class="s">${g.tickets.length} tickets · ${r.state==='done'?'checked':'waiting for result'}</span></div><span class="mono">−${(g.tickets.length*g.price).toLocaleString()}${Number(g.won)?` <span style="color:#4fd38c">+${Number(g.won).toLocaleString()}</span>`:''}</span></div>`}).join(''):'<div class="item"><span class="sub">Saved tickets appear here with their cost.</span></div>'}</div></section>
+  <section class="card"><h2>Settings</h2>
+    <div class="grid2"><label class="field">Monthly limit<input id="limit" type="number" min="0" step="any" value="${S.limit}" data-chg="limit"></label><label class="field">Ticket price<input id="price" type="number" min="0" step="any" value="${S.price}" data-chg="price"></label></div>
+    <label class="field">Currency<input id="cur" type="text" maxlength="4" value="${esc(S.cur)}" data-chg="cur"></label>
+    <label class="between" style="gap:12px"><span>Remind me at 80% of my limit</span><input id="remind" type="checkbox" ${S.remind?'checked':''} data-chg="remind"></label>
+    <label class="between" style="gap:12px"><span>Block saving tickets over the limit</span><input id="pause" type="checkbox" ${S.pauseOver?'checked':''} data-chg="pauseOver"></label>
+  </section>
+  <a class="btn block" href="#syndicate" style="justify-content:space-between">Play with a group? Syndicate splitter${ICON.chev}</a>
+  </main>`}
 
-const VIEWS=['overview','backtest','generate','odds','data'];
-function route(){const h=location.hash.slice(1);const v=VIEWS.includes(h)?h:'overview';VIEWS.forEach(x=>{$('#v-'+x).hidden=x!==v});
-  $$('nav.tabs a').forEach(a=>a.setAttribute('aria-current',a.getAttribute('href')==='#'+v?'page':'false'))}
-window.addEventListener('hashchange',route);
+function vSyndicate(){const s=S.syn;const pot=s.members.reduce((a,m)=>a+(Number(m.paid)||0),0);const colors=['#e3222f','#2b62c6','#1d9452','#9a6a00','#7a4bbd','#c4502f'];
+  return top(esc(s.name),`${s.members.length} member${s.members.length>1?'s':''} · pot ${money(pot)}`,{back:'budget'})+`<main>
+  <section class="hero" style="gap:10px"><label class="eyebrow" for="synPrize">If the group wins (${esc(S.cur)})</label>
+    <input id="synPrize" type="number" min="0" step="any" value="${Number(s.prize)||0}" data-inp="synPrize" style="height:52px;border:0;border-radius:12px;padding:0 14px;background:rgba(0,0,0,.3);color:#fff;font:600 24px var(--f-mono)">
+    <span class="soft" style="font-size:13px">Split by what each member paid in</span></section>
+  <section class="card flush"><div class="list" id="synList">${s.members.map((m,i)=>{const share=pot?(Number(m.paid)||0)/pot:0;return `<div class="item" style="gap:8px"><span class="row" style="gap:10px;min-width:0;flex:1"><span style="width:30px;height:30px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;background:${colors[i%colors.length]}">${esc((m.name||'?')[0].toUpperCase())}</span><input aria-label="Member name" value="${esc(m.name)}" data-chg="synName" data-v="${i}" style="min-width:0;flex:1;height:36px;border:1px solid transparent;border-radius:8px;background:transparent;padding:0 6px"></span>
+    <label class="mono" style="display:flex;align-items:center;gap:4px;font-size:13px"><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Paid</span><input type="number" min="0" step="any" value="${Number(m.paid)||0}" data-chg="synPaid" data-v="${i}" style="width:64px;height:36px;border:1px solid var(--line3);border-radius:8px;background:var(--card2);padding:0 6px;text-align:right;font-family:var(--f-mono)"></label>
+    <span class="mono" style="width:44px;text-align:right;font-size:13px;color:var(--muted)">${Math.round(share*100)}%</span><span class="mono syn-get" style="width:76px;text-align:right;font-weight:600;color:#4fd38c">${(share*(Number(s.prize)||0)).toFixed(2)}</span>
+    <button class="icon-btn" style="width:36px;height:36px;border-radius:18px" aria-label="Remove ${esc(m.name)}" data-act="synDel" data-v="${i}">×</button></div>`}).join('')}</div></section>
+  <label class="field">Group name<input id="synNm" type="text" value="${esc(s.name)}" data-chg="synGroup"></label>
+  <div class="row"><button class="btn" style="flex:1" data-act="synAdd">Add member</button><button class="btn primary" style="flex:1" data-act="synCopy">Copy summary</button></div>
+  </main>`}
 
-(function init(){let saved=null;try{saved=JSON.parse(localStorage.getItem('drawlab')||'null')}catch(e){}
-  if(saved&&saved.preset){$('#game').value=saved.preset;S.preset=saved.preset;S.k=saved.k;S.N=saved.N;
-    if(saved.preset==='custom'){$('#customBox').hidden=false;$('#ck').value=S.k;$('#cn').value=S.N}
-    if(saved.source==='import'&&saved.draws&&saved.draws.length){S.draws=saved.draws;S.source='import'}else loadSample()}
-  else loadSample();
-  route();renderAll()})();
+function vData(){const last=S.draws.slice(-15).reverse();return top('Draw history',`${S.draws.length} draws · ${S.source==='sample'?'simulated sample':'your data'}`,{back:'home'})+`<main>
+  <section class="card"><h2>Import real results</h2><p class="sub">Paste rows or load a CSV. Each row: a date (optional) and the main numbers, like <span class="mono">2026-10-24, 3, 11, 19, 27, 38, 45</span>. The first ${S.k} distinct numbers from 1 to ${S.N} are used; bonus balls are ignored.</p>
+    <textarea id="paste" aria-label="Draw rows" placeholder="2026-10-21, 5, 12, 18, 30, 41, 47"></textarea>
+    <input id="file" type="file" accept=".csv,.txt,text/csv,text/plain" aria-label="Choose CSV file" data-chg="file">
+    <label class="between"><span>Newest draw is listed first</span><input id="newest" type="checkbox"></label>
+    <div class="row"><button class="btn primary" style="flex:1" data-act="import">Import draws</button><button class="btn" style="flex:1" data-act="sample">Use sample</button></div></section>
+  <section class="card"><h2>Latest loaded draws</h2><div class="tablebox"><table><tr><th>Date</th><th>Numbers</th></tr>${last.map(d=>`<tr><td>${esc(d.date||'—')}</td><td class="mono">${d.nums.join(' · ')}</td></tr>`).join('')}</table></div></section>
+  </main>`}
+
+/* ================= router ================= */
+const VIEWS={home:vHome,insights:vInsights,test:vTest,tickets:vTickets,score:vScore,checker:vChecker,outcomes:vOutcomes,budget:vBudget,syndicate:vSyndicate,data:vData};
+const PARENT={score:'tickets',checker:'tickets',outcomes:'home',budget:'home',syndicate:'home',data:'home'};
+let current='home';
+function render(keepScroll){const h=location.hash.slice(1);current=VIEWS[h]?h:'home';const y=window.scrollY;
+  $('#screen').innerHTML=VIEWS[current]();const tab=PARENT[current]||current;
+  document.querySelectorAll('#tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===tab?'page':'false'));
+  window.scrollTo(0,keepScroll?y:0)}
+window.addEventListener('hashchange',()=>render(false));
+
+let toastT;function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
+function copyText(txt,okMsg){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast(okMsg)).catch(()=>toast('Copy blocked: select the text manually.'))}else toast('Copy not supported on this device.')}
+function parseRows(text,newestFirst){const out=[];let skipped=0;const DATE=/(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4})/;
+  for(const raw of text.split(/\r?\n/)){const line=raw.trim();if(!line)continue;const dm=line.match(DATE);let date=dm?dm[1]:'';
+    if(date&&!/^\d{4}/.test(date)){const p=date.split(/[-/.]/);let yy=p[2].length===2?'20'+p[2]:p[2];date=`${yy}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`}else if(date)date=date.replace(/[/.]/g,'-').replace(/-(\d)(?=-|$)/g,'-0$1');
+    const rest=dm?line.replace(dm[1],' '):line;const nums=[];for(const m of rest.matchAll(/\d+/g)){const v=+m[0];if(v>=1&&v<=S.N&&!nums.includes(v))nums.push(v);if(nums.length===S.k)break}
+    if(nums.length===S.k)out.push({date,nums:nums.sort((a,b)=>a-b)});else skipped++}
+  if(newestFirst)out.reverse();return{out,skipped}}
+
+/* ================= actions ================= */
+const ACT={
+  period:el=>{S.period=+el.dataset.v;save();render(true)},
+  rerun:()=>{btCache=null;render(true);toast('Test re-run.')},
+  strat:el=>{S.gen.strategy=el.dataset.v;genTickets();render(true)},
+  count:el=>{S.gen.count=Math.max(1,Math.min(10,S.gen.count+ +el.dataset.v));genTickets();render(true)},
+  generate:()=>{genTickets();render(true)},
+  score:(el,e)=>{e.preventDefault();S.scoreRef=+el.dataset.v;location.hash='score'},
+  lower:()=>{const i=S.scoreRef??0;S.gen.tickets[i]=lowerRisk(S.gen.tickets[i]);save();render(true);toast('Ticket updated.')},
+  copy:()=>copyText(S.gen.tickets.map(t=>t.join(' ')).join('\n'),'Tickets copied.'),
+  saveTickets:()=>{const cost=S.gen.tickets.length*S.price;const sp=monthSpend();
+    if(S.pauseOver&&S.limit>0&&sp+cost>S.limit){toast(`That would pass your ${money(S.limit)} monthly limit. Change it in Budget.`);return}
+    S.groups.push({id:Date.now().toString(36),game:S.game,after:drawKey(S.draws.at(-1)),tickets:S.gen.tickets.map(t=>t.slice()),price:S.price,created:new Date().toISOString(),won:0});save();
+    const after=sp+cost;toast(S.remind&&S.limit>0&&after>=0.8*S.limit?`Saved. You have used ${Math.round(after/S.limit*100)}% of this month's limit.`:'Saved. They will be checked when the next result is added.')},
+  delGroup:el=>{S.groups=S.groups.filter(g=>g.id!==el.dataset.v);save();render(true)},
+  addResult:()=>{const nums=[...new Set((($('#resNums').value||'').match(/\d+/g)||[]).map(Number).filter(v=>v>=1&&v<=S.N))];
+    if(nums.length!==S.k){toast(`Enter exactly ${S.k} different numbers from 1 to ${S.N}.`);return}
+    const date=$('#resDate').value||new Date().toISOString().slice(0,10);S.draws.push({date,nums:nums.sort((a,b)=>a-b)});if(S.source==='sample')S.source='mixed';btCache=null;save();render(false);toast('Result added and tickets checked.')},
+  import:()=>{const{out,skipped}=parseRows($('#paste').value,$('#newest').checked);if(out.length<20){toast(`Found ${out.length} valid draws. Add at least 20 rows with ${S.k} numbers each.`);return}
+    S.draws=out;S.source='import';btCache=null;save();render(false);toast(`Imported ${out.length} draws${skipped?`, skipped ${skipped} rows`:''}.`)},
+  sample:()=>{loadSample();save();render(false);toast('Loaded the simulated sample.')},
+  synAdd:()=>{S.syn.members.push({name:'Member '+(S.syn.members.length+1),paid:0});save();render(true)},
+  synDel:el=>{S.syn.members.splice(+el.dataset.v,1);if(!S.syn.members.length)S.syn.members.push({name:'You',paid:0});save();render(true)},
+  synCopy:()=>{const s=S.syn,pot=s.members.reduce((a,m)=>a+(Number(m.paid)||0),0);const lines=s.members.map(m=>{const sh=pot?(Number(m.paid)||0)/pot:0;return `${m.name}: paid ${money(m.paid||0)}, ${Math.round(sh*100)}%, gets ${money((sh*(Number(s.prize)||0)).toFixed(2))}`});copyText(`${s.name} — prize ${money(s.prize||0)}\n`+lines.join('\n'),'Summary copied.')}
+};
+const CHG={
+  game:el=>{S.game=el.value;const g=GAMES[S.game];S.k=g.k;S.N=g.N;S.price=g.price;S.cur=g.cur;S.gen.tickets=[];loadSample();save();render(false);toast(`Switched to ${g.name}. Import its real results in Draw history.`)},
+  win:el=>{S.win=Math.max(10,+el.value||100)},warm:el=>{S.warm=Math.max(10,+el.value||50)},
+  avoid:el=>{S.gen.avoid=el.checked;genTickets();render(true)},
+  won:el=>{const g=S.groups.find(x=>x.id===el.dataset.v);if(g){g.won=Math.max(0,+el.value||0);save();toast('Prize saved.')}},
+  limit:el=>{S.limit=Math.max(0,+el.value||0);save();render(true)},price:el=>{S.price=Math.max(0,+el.value||0);save();render(true)},
+  cur:el=>{S.cur=el.value.trim()||'$';save();render(true)},remind:el=>{S.remind=el.checked;save()},pauseOver:el=>{S.pauseOver=el.checked;save()},
+  synName:el=>{S.syn.members[+el.dataset.v].name=el.value.trim()||'Member';save();render(true)},
+  synPaid:el=>{S.syn.members[+el.dataset.v].paid=Math.max(0,+el.value||0);save();render(true)},
+  synGroup:el=>{S.syn.name=el.value.trim()||'My syndicate';save();render(true)},
+  file:el=>{const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#paste').value=r.result;toast('File loaded. Tap Import draws.')};r.readAsText(f)}
+};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(el&&ACT[el.dataset.act])ACT[el.dataset.act](el,e)});
+document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el&&CHG[el.dataset.chg])CHG[el.dataset.chg](el,e)});
+document.addEventListener('input',e=>{if(e.target.dataset.inp==='synPrize'){S.syn.prize=Math.max(0,+e.target.value||0);save();const pot=S.syn.members.reduce((a,m)=>a+(Number(m.paid)||0),0);
+  document.querySelectorAll('.syn-get').forEach((el,i)=>{const m=S.syn.members[i];el.textContent=((pot?(Number(m.paid)||0)/pot:0)*S.syn.prize).toFixed(2)})}});
+
+/* ================= start ================= */
+load();if(!S.draws.length)loadSample();render(false);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
 </body>
 </html>

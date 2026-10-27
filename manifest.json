@@ -7,8 +7,8 @@
   "scope": "/lottery-draw-lab/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#eef2f0",
-  "theme_color": "#0e5a45",
+  "background_color": "#0b0b0c",
+  "theme_color": "#111113",
   "lang": "en",
   "categories": ["utilities", "entertainment"],
   "icons": [
