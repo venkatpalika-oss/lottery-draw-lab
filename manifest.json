@@ -1,1 +1,20 @@
-{"name":"Lottery Draw Lab","short_name":"Draw Lab","start_url":"./","display":"standalone","background_color":"#eef2f0","theme_color":"#0e5a45","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "id": "/lottery-draw-lab/",
+  "name": "Lottery Draw Lab",
+  "short_name": "Draw Lab",
+  "description": "Lottery statistics: number frequencies, gaps, strategy backtests against chance, ticket generator and exact odds.",
+  "start_url": "/lottery-draw-lab/",
+  "scope": "/lottery-draw-lab/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef2f0",
+  "theme_color": "#0e5a45",
+  "lang": "en",
+  "categories": ["utilities", "entertainment"],
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
