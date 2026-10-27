@@ -244,14 +244,14 @@ const ICON={back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" st
   warn:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e0b04a" stroke-width="2.4" aria-hidden="true" style="flex:none"><path d="M12 7v6M12 16.5v.5"/></svg>',
   bad:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff5a63" stroke-width="2.4" aria-hidden="true" style="flex:none"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   ring:'<svg class="ring" width="160" height="160" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="70" fill="none" stroke="#fff" stroke-width="2"/><circle cx="80" cy="80" r="48" fill="none" stroke="#fff" stroke-width="2"/></svg>'};
-const top=(title,sub,{back,right=''}={})=>`<header class="top">${back?`<a class="back" href="#${back}" aria-label="Back">${ICON.back}</a>`:''}<div class="titles"><h1>${title}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${right}</header>`;
+const topBar=(title,sub,{back,right=''}={})=>`<header class="top">${back?`<a class="back" href="#${back}" aria-label="Back">${ICON.back}</a>`:''}<div class="titles"><h1>${title}</h1>${sub?`<p class="sub">${sub}</p>`:''}</div>${right}</header>`;
 const gameSelect=()=>`<label class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" for="gameSel">Game</label><select id="gameSel" class="game" data-chg="game">${Object.entries(GAMES).map(([id,g])=>`<option value="${id}" ${id===S.game?'selected':''}>${g.name}</option>`).join('')}</select>`;
 
 function vHome(){const{k,N}=S;const last=S.draws.at(-1);const st=stats(S.draws.length);
   const p3=[...Array(k+1).keys()].filter(m=>m>=3).reduce((a,m)=>a+hyper(m,k,N),0);const per=Math.round(p3*1000);
   const pend=myGroups().filter(g=>resolve(g).state==='pending');const tks=pend.flatMap(g=>g.tickets).slice(0,3);
   const jack=Math.exp(lC(N,k));
-  return top('Draw Lab',`${GAMES[S.game].name} · ${k} of ${N}`,{right:`<a class="icon-btn" href="#budget" aria-label="Budget"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg></a>${gameSelect()}`})+
+  return topBar('Draw Lab',`${GAMES[S.game].name} · ${k} of ${N}`,{right:`<a class="icon-btn" href="#budget" aria-label="Budget"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg></a>${gameSelect()}`})+
   `<main>
   <section class="hero">${ICON.ring}
     <div class="between"><span class="eyebrow">Latest draw</span><span class="mono soft" style="font-size:13px">${last?fmtDate(last.date):''}</span></div>
@@ -276,7 +276,7 @@ function vInsights(){const P=S.period>=S.draws.length?S.draws.length:S.period;co
   const bars=st.cnt.slice(1).map((c,i)=>`<i class="${c>st.E+2*st.sd?'hi':c<st.E-2*st.sd?'lo':''}" style="height:${y(c)}%" title="${i+1}: ${c}"></i>`).join('');
   const outside=st.cnt.slice(1).filter(c=>Math.abs(c-st.E)>2*st.sd).length;
   const ticks=[1,10,20,30,40,N].filter((v,i,a)=>v<=N&&a.indexOf(v)===i);
-  return top('Number insights',`${GAMES[S.game].name} · ${S.source==='sample'?'sample data':'your data'}`)+`<main>
+  return topBar('Number insights',`${GAMES[S.game].name} · ${S.source==='sample'?'sample data':'your data'}`)+`<main>
   <div class="seg" role="group" aria-label="Period">${[[100,'Last 100'],[500,'Last 500'],[1e9,'All']].map(([v,l])=>`<button data-act="period" data-v="${v}" aria-pressed="${S.period===v}">${l}</button>`).join('')}</div>
   <section class="card">
     <div class="between"><h2>Times drawn, 1–${N}</h2><span class="mono" style="font-size:12px;color:var(--muted)">expected ${st.E.toFixed(1)}</span></div>
@@ -297,7 +297,7 @@ function vInsights(){const P=S.period>=S.draws.length?S.draws.length:S.period;co
   </main>`}
 
 function vTest(){const bt=backtest();const{res,mu,T}=bt;const thr=0.05/(res.length-1);const beat=res.filter(r=>r.id!=='random'&&r.z>0&&r.p<thr);
-  return top('Strategy test',`Each strategy picked one ticket for ${T} past draws, using only earlier results.`)+`<main>
+  return topBar('Strategy test',`Each strategy picked one ticket for ${T} past draws, using only earlier results.`)+`<main>
   <section class="hero" style="gap:6px">${ICON.ring}
     <span class="eyebrow">Verdict</span>
     <p style="margin:0;font-family:var(--f-display);font-size:21px;font-weight:600;line-height:1.25">${!T?'Load more draws to run the test.':beat.length?`${esc(beat.map(b=>b.name).join(', '))} beat chance this time.`:'No strategy beat random picks.'}</p>
@@ -317,7 +317,7 @@ function genTickets(){const{k,N,draws}=S;const g=S.gen;const r=mulberry32((Date.
   const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);const t=draws.length;draws.forEach((d,i)=>d.nums.forEach(x=>{last[x]=i;if(i>=t-S.win)cnt[x]++}));
   const out=[],seen=new Set();for(let i=0;i<g.count;i++){let tk,n=0;do{tk=pickTicket(g.strategy,{k,N,cnt,last,t},r);n++}while(n<300&&((g.avoid&&crowdScore(tk).s>=35)||seen.has(tk.join())));seen.add(tk.join());out.push(tk)}g.tickets=out;save()}
 function vTickets(){const g=S.gen;if(!g.tickets.length||g.tickets[0].length!==S.k)genTickets();
-  return top('Tickets',`For ${GAMES[S.game].name}, next draw`)+`<main>
+  return topBar('Tickets',`For ${GAMES[S.game].name}, next draw`)+`<main>
   <section class="card">
     <div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Strategy</span><div class="chips">${STRATS.map(s=>`<button data-act="strat" data-v="${s.id}" aria-pressed="${g.strategy===s.id}">${s.chip}</button>`).join('')}</div></div>
     <div class="between"><span style="font-weight:500">Number of tickets</span><div class="stepper"><button aria-label="Fewer tickets" data-act="count" data-v="-1">−</button><span>${g.count}</span><button aria-label="More tickets" data-act="count" data-v="1">+</button></div></div>
@@ -333,7 +333,7 @@ function vTickets(){const g=S.gen;if(!g.tickets.length||g.tickets[0].length!==S.
 
 function vScore(){if(!S.gen.tickets.length||S.gen.tickets[0].length!==S.k)genTickets();let t=S.scoreRef!=null?S.gen.tickets[S.scoreRef]:null;if(!t){t=S.gen.tickets[0]||sampleK(S.N,S.k,Math.random);S.scoreRef=0}
   const c=crowdScore(t);const col={good:'#4fd38c',mid:'#e0b04a',bad:'#ff8a90'}[c.cls];
-  return top('Prize-sharing score','How many others might pick the same numbers',{back:'tickets'})+`<main>
+  return topBar('Prize-sharing score','How many others might pick the same numbers',{back:'tickets'})+`<main>
   <section class="card" style="border-radius:20px;gap:14px">
     <div class="balls">${t.map(x=>ball(x)).join('')}</div>
     <div class="between" style="align-items:flex-end"><div style="display:flex;flex-direction:column"><span class="eyebrow">Crowd risk</span><span style="font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1.1;color:${col}">${c.level}</span></div><span class="mono" style="font-weight:600;font-size:28px">${c.s}<span style="font-size:15px;color:var(--muted)">/100</span></span></div>
@@ -354,7 +354,7 @@ function vChecker(){const gs=myGroups().slice().reverse();const done=gs.map(g=>(
     <div class="list">${g.tickets.map((t,i)=>{const m=nums?t.filter(x=>nums.includes(x)).length:null;return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px"><div class="between"><span class="mono" style="font-size:12px;color:var(--muted)">Ticket ${i+1}</span>${m===null?'<span class="pill">Pending</span>':`<span class="pill ${m>=3?'good':''}">${m>=3?'Matched '+m:m===0?'No match':'Matched '+m+' · no prize'}</span>`}</div><div class="balls">${t.map(x=>ball(x,'md '+(nums?(nums.includes(x)?'hit':'miss'):''))).join('')}</div></div>`}).join('')}</div>
     ${r.state==='done'?`<label class="between" style="padding:10px 0 12px;gap:12px"><span class="sub" style="font-size:13.5px">Prize won for this draw (${esc(S.cur)})</span><input type="number" min="0" step="any" value="${Number(g.won)||0}" data-chg="won" data-v="${g.id}" style="width:110px;height:40px;border:1px solid var(--line3);border-radius:10px;background:var(--card2);padding:0 10px;font-family:var(--f-mono)"></label>`:''}
     <div style="padding-bottom:10px"><button class="btn" style="height:40px;font-size:13.5px" data-act="delGroup" data-v="${g.id}">Remove</button></div></section>`}).join(''):`<section class="card"><p class="sub">No saved tickets yet. On the Tickets screen tap "Save &amp; check later". They are checked automatically when the next result is added.</p><a class="btn primary" href="#tickets">Go to tickets</a></section>`;
-  return top('Ticket checker','Saved tickets against each new result',{back:'tickets'})+`<main>${sum}${body}
+  return topBar('Ticket checker','Saved tickets against each new result',{back:'tickets'})+`<main>${sum}${body}
   <section class="card"><h2>Add the latest result</h2><p class="sub">Enter the ${S.k} main numbers once the draw is out. Saved tickets are checked straight away.</p>
     <div class="grid2"><label class="field">Draw date<input id="resDate" type="date"></label><label class="field">Numbers<input id="resNums" type="text" inputmode="numeric" placeholder="3 11 19 27 38 45"></label></div>
     <button class="btn outline block" data-act="addResult">Add result</button>
@@ -363,7 +363,7 @@ function vChecker(){const gs=myGroups().slice().reverse();const done=gs.map(g=>(
 
 function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N);const per=Math.round(p3*1000);const me=myRecord();const yt=yearTotals();
   const rows=[];for(let m=3;m<=k;m++)rows.push(`<div class="item"><span${m===k?' style="font-weight:600"':''}>${m===k?'Jackpot, all '+k:'Match '+m+' numbers'}</span><span class="mono" style="font-size:14px;color:${m===k?'var(--red-ink)':'var(--muted)'};font-weight:${m===k?600:400}">${oneIn(hyper(m,k,N))}</span></div>`);
-  return top('Wins &amp; losses',`What happens to ${GAMES[S.game].name} tickets`,{back:'home'})+`<main>
+  return topBar('Wins &amp; losses',`What happens to ${GAMES[S.game].name} tickets`,{back:'home'})+`<main>
   <section class="hero" style="gap:12px"><span class="eyebrow">Out of every 1,000 tickets</span>
     <div class="row" style="gap:22px;align-items:baseline"><div style="display:flex;flex-direction:column"><span class="big">${1000-per}</span><span class="soft" style="font-size:13px">match 2 or fewer</span></div><div style="display:flex;flex-direction:column"><span class="big">${per}</span><span class="soft" style="font-size:13px">match 3 or more</span></div></div>
     <div class="split" role="img" aria-label="${1000-per} of 1,000 match 2 or fewer; ${per} match 3 or more"><div style="width:${100-per/10}%;background:#2a0508"></div><div style="width:${per/10}%;min-width:6px;background:#fff"></div></div></section>
@@ -376,7 +376,7 @@ function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N)
 function vBudget(){const sp=monthSpend();const pct=S.limit>0?Math.min(100,sp/S.limit*100):0;const yt=yearTotals();const net=yt.won-yt.spent;
   const now=new Date();const reset=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
   const entries=S.groups.slice().reverse().slice(0,8);
-  return top('Budget','Spending against prizes',{back:'home'})+`<main>
+  return topBar('Budget','Spending against prizes',{back:'home'})+`<main>
   <section class="hero">${ICON.ring}<div class="between"><span class="eyebrow">${now.toLocaleDateString('en-GB',{month:'long'})} limit</span><span class="mono soft" style="font-size:13px">${money(S.limit)}</span></div>
     <div class="row" style="align-items:baseline;gap:8px"><span class="big" style="font-size:34px">${money(sp)}</span><span class="soft">spent</span></div>
     <div class="progress" role="img" aria-label="${Math.round(pct)} percent of the monthly limit used"><div style="width:${pct}%;${pct>=100?'background:#ffd6d8':''}"></div></div>
@@ -393,7 +393,7 @@ function vBudget(){const sp=monthSpend();const pct=S.limit>0?Math.min(100,sp/S.l
   </main>`}
 
 function vSyndicate(){const s=S.syn;const pot=s.members.reduce((a,m)=>a+(Number(m.paid)||0),0);const colors=['#e3222f','#2b62c6','#1d9452','#9a6a00','#7a4bbd','#c4502f'];
-  return top(esc(s.name),`${s.members.length} member${s.members.length>1?'s':''} · pot ${money(pot)}`,{back:'budget'})+`<main>
+  return topBar(esc(s.name),`${s.members.length} member${s.members.length>1?'s':''} · pot ${money(pot)}`,{back:'budget'})+`<main>
   <section class="hero" style="gap:10px"><label class="eyebrow" for="synPrize">If the group wins (${esc(S.cur)})</label>
     <input id="synPrize" type="number" min="0" step="any" value="${Number(s.prize)||0}" data-inp="synPrize" style="height:52px;border:0;border-radius:12px;padding:0 14px;background:rgba(0,0,0,.3);color:#fff;font:600 24px var(--f-mono)">
     <span class="soft" style="font-size:13px">Split by what each member paid in</span></section>
@@ -405,7 +405,7 @@ function vSyndicate(){const s=S.syn;const pot=s.members.reduce((a,m)=>a+(Number(
   <div class="row"><button class="btn" style="flex:1" data-act="synAdd">Add member</button><button class="btn primary" style="flex:1" data-act="synCopy">Copy summary</button></div>
   </main>`}
 
-function vData(){const last=S.draws.slice(-15).reverse();return top('Draw history',`${S.draws.length} draws · ${S.source==='sample'?'simulated sample':'your data'}`,{back:'home'})+`<main>
+function vData(){const last=S.draws.slice(-15).reverse();return topBar('Draw history',`${S.draws.length} draws · ${S.source==='sample'?'simulated sample':'your data'}`,{back:'home'})+`<main>
   <section class="card"><h2>Import real results</h2><p class="sub">Paste rows or load a CSV. Each row: a date (optional) and the main numbers, like <span class="mono">2026-10-24, 3, 11, 19, 27, 38, 45</span>. The first ${S.k} distinct numbers from 1 to ${S.N} are used; bonus balls are ignored.</p>
     <textarea id="paste" aria-label="Draw rows" placeholder="2026-10-21, 5, 12, 18, 30, 41, 47"></textarea>
     <input id="file" type="file" accept=".csv,.txt,text/csv,text/plain" aria-label="Choose CSV file" data-chg="file">
