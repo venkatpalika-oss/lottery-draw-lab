@@ -104,6 +104,16 @@ async def main():
               and "tickets" not in mig["gen"] and set(mig["groups"][0].keys()) == {"id", "game", "after", "created", "sets"}
               and mig["log"] == [], mig)
 
+        # stored data after an upgrade: removed fields must be gone from storage, not just from memory
+        await pg.evaluate("""() => localStorage.setItem('drawlab2', JSON.stringify({game:'marksix',k:6,N:49,source:'sample',
+            syn:{members:[{name:'A',paid:5}]},price:10,pauseOver:true,gen:{tickets:[[1,2,3,4,5,6]]},
+            groups:[{id:'a',game:'marksix',after:'x',created:'2026-10-01',tickets:[[1,2,3,4,5,6]],price:10,won:40}]}))""")
+        await pg.reload(); await pg.wait_for_timeout(600)
+        st = await pg.evaluate("JSON.parse(localStorage.getItem('drawlab2'))")
+        check("upgrade rewrites storage without syndicate/price/prize fields",
+              not {"syn", "price", "pauseOver"} & set(st) and set(st["groups"][0]) == {"id", "game", "after", "created", "sets"}
+              and st["groups"][0]["sets"] == [[1, 2, 3, 4, 5, 6]] and "tickets" not in st["gen"], st)
+
         # 3. network isolation and script errors
         check("no external network requests", not external, external[:5])
         check("no script errors", not errors, errors[:3])
