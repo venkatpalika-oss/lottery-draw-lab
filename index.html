@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#111113">
-<meta name="description" content="The honest lottery app: real odds, strategies tested against chance, prize-sharing scores, ticket checker and budget tracker.">
+<meta name="description" content="Lottery statistics and probability: real odds, strategies tested against chance, number-set sampling and historical result comparison.">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-v2.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192-v2.png">
@@ -61,7 +61,7 @@ main{position:relative;z-index:1;padding:16px max(16px,env(safe-area-inset-right
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:16px;overflow:hidden}
 .tile{background:var(--card);padding:12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .tile .k{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
-.tile .v{font-family:var(--f-mono);font-weight:600;font-size:19px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .v{font-family:var(--f-mono);font-weight:600;font-size:clamp(14px,4.4vw,19px);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .s{font-size:12px;color:var(--muted)}
 .ball{width:40px;height:40px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-weight:600;font-size:15px;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25);background:var(--b-green)}
 .ball.r{background:var(--b-red)}.ball.b{background:var(--b-blue)}.ball.g{background:var(--b-green)}
@@ -153,23 +153,28 @@ th{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06
   <a href="#home" data-tab="home"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg></span>Home</a>
   <a href="#insights" data-tab="insights"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span>Insights</a>
   <a href="#test" data-tab="test"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span>Test</a>
-  <a href="#tickets" data-tab="tickets"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4z"/></svg></span>Tickets</a>
+  <a href="#sets" data-tab="sets"><span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="6.5" cy="12" r="3"/><circle cx="12" cy="12" r="3"/><circle cx="17.5" cy="12" r="3"/></svg></span>Number sets</a>
 </nav>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
 /* ================= constants & state ================= */
 const $=s=>document.querySelector(s);
-const GAMES={marksix:{name:'Mark Six',k:6,N:49,price:10,cur:'HK$'},uk:{name:'UK Lotto',k:6,N:59,price:2,cur:'£'},euro:{name:'EuroMillions',k:5,N:50,price:2.5,cur:'€'},pb:{name:'Powerball',k:5,N:69,price:2,cur:'$'}};
+const GAMES={marksix:{name:'Mark Six',k:6,N:49,cur:'HK$'},uk:{name:'UK Lotto',k:6,N:59,cur:'£'},euro:{name:'EuroMillions',k:5,N:50,cur:'€'},pb:{name:'Powerball',k:5,N:69,cur:'$'}};
 const STRATS=[{id:'random',name:'Random',chip:'Random',color:'#9a9496'},{id:'hot',name:'Lean hot',chip:'Lean hot',color:'#ff7a55'},{id:'cold',name:'Lean cold',chip:'Lean cold',color:'#6ea2ee'},{id:'overdue',name:'Lean overdue',chip:'Overdue',color:'#e0b04a'},{id:'mix',name:'Hot + cold mix',chip:'Hot + cold',color:'#b98cf0'}];
 const HK_RED=[1,2,7,8,12,13,18,19,23,24,29,30,34,35,40,45,46],HK_BLUE=[3,4,9,10,14,15,20,25,26,31,36,37,41,42,47,48];
 const KEY='drawlab2';
 const S={game:'marksix',k:6,N:49,draws:[],source:'sample',win:100,warm:50,period:100,
-  groups:[],price:10,cur:'HK$',limit:200,remind:true,pauseOver:true,
-  syn:{name:'My syndicate',members:[{name:'You',paid:10}],prize:0},
-  gen:{strategy:'random',count:5,avoid:true,tickets:[]},scoreRef:null};
+  groups:[],cur:'HK$',limit:200,remind:true,log:[],
+  gen:{strategy:'random',count:5,avoid:true,sets:[]},scoreRef:null};
 function save(){try{const o={...S,draws:S.source==='sample'?[]:S.draws};delete o.scoreRef;localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
-function load(){try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o)Object.assign(S,o,{scoreRef:null})}catch(e){}}
+/* v1 migration: drop the removed syndicate data and ticket pricing, rename tickets to number sets,
+   and detach saved sets from any spending or prize figures */
+function migrate(o){if(!o||typeof o!=='object')return o;delete o.syn;delete o.price;delete o.pauseOver;
+  if(o.gen){if(o.gen.tickets&&!o.gen.sets)o.gen.sets=o.gen.tickets;delete o.gen.tickets}
+  if(Array.isArray(o.groups))o.groups=o.groups.map(g=>({id:g.id,game:g.game,after:g.after,created:g.created,sets:g.sets||g.tickets||[]}));
+  if(!Array.isArray(o.log))o.log=[];return o}
+function load(){try{const o=migrate(JSON.parse(localStorage.getItem(KEY)||'null'));if(o)Object.assign(S,o,{scoreRef:null})}catch(e){}}
 
 /* ================= maths ================= */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -181,7 +186,7 @@ function erfc(x){const z=Math.abs(x),t=1/(1+0.5*z);const r=t*Math.exp(-z*z-1.265
 const pTwo=z=>erfc(Math.abs(z)/Math.SQRT2);
 function sampleK(N,k,r){const a=Array.from({length:N},(_,i)=>i+1);for(let i=0;i<k;i++){const j=i+Math.floor(r()*(N-i));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,k).sort((x,y)=>x-y)}
 function weightedK(w,k,r,ex=new Set()){const out=[],ww=w.slice();ex.forEach(x=>ww[x]=0);for(let j=0;j<k;j++){let tot=0;for(let i=1;i<ww.length;i++)tot+=ww[i];let u=r()*tot,pick=-1;for(let i=1;i<ww.length;i++){if(ww[i]<=0)continue;pick=i;u-=ww[i];if(u<=0)break}out.push(pick);ww[pick]=0}return out}
-function pickTicket(id,{k,N,cnt,last,t},r){if(id==='random')return sampleK(N,k,r);
+function pickSet(id,{k,N,cnt,last,t},r){if(id==='random')return sampleK(N,k,r);
   const hot=[0],cold=[0];let cmax=0;for(let i=1;i<=N;i++)cmax=Math.max(cmax,cnt[i]);for(let i=1;i<=N;i++){hot[i]=(cnt[i]+0.5)**2;cold[i]=(cmax-cnt[i]+0.5)**2}
   const srt=a=>a.sort((x,y)=>x-y);
   if(id==='hot')return srt(weightedK(hot,k,r));if(id==='cold')return srt(weightedK(cold,k,r));
@@ -212,33 +217,35 @@ let btCache=null;
 function backtest(){const ck=[S.game,S.draws.length,drawKey(S.draws.at(-1)),S.win,S.warm].join();if(btCache&&btCache.ck===ck)return btCache;
   const{draws,k,N,win,warm}=S;const r=mulberry32(20261027);const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);
   const mu=k*k/N,v=k*(k/N)*((N-k)/N)*((N-k)/(N-1));const res=STRATS.map(s=>({...s,total:0,n:0}));
-  for(let t=0;t<draws.length;t++){if(t>=warm){const set=new Set(draws[t].nums);for(const s of res){const tk=pickTicket(s.id,{k,N,cnt,last,t},r);let m=0;for(const x of tk)if(set.has(x))m++;s.total+=m;s.n++}}
+  for(let t=0;t<draws.length;t++){if(t>=warm){const set=new Set(draws[t].nums);for(const s of res){const tk=pickSet(s.id,{k,N,cnt,last,t},r);let m=0;for(const x of tk)if(set.has(x))m++;s.total+=m;s.n++}}
     for(const x of draws[t].nums){cnt[x]++;last[x]=t}if(t-win>=0)for(const x of draws[t-win].nums)cnt[x]--}
   for(const s of res){s.mean=s.n?s.total/s.n:0;s.z=s.n?(s.total-s.n*mu)/Math.sqrt(s.n*v):0;s.p=pTwo(s.z)}
   btCache={ck,res,mu,T:res[0].n};return btCache}
 
-/* prize-sharing score: rule-based estimate of how popular a combination is */
+/* pattern popularity: rule-based estimate of how commonly people choose a pattern (statistics only) */
 function crowdScore(t){const{N}=S;const last=S.draws.at(-1);const f=[];let s=0;
   const b=t.filter(x=>x<=31).length;const bp=N>31?[0,0,0,10,25,45,65][Math.min(6,b+(6-t.length))]:0;s+=bp;
-  f.push({ok:bp<10,title:'Birthday numbers (1–31)',sub:`${b} of ${t.length}${bp>=10?', many players use only these':', a good mix'}`});
+  f.push({ok:bp<10,title:'Date-range numbers (1–31)',sub:`${b} of ${t.length}${bp>=10?', a very commonly chosen range':', a spread-out mix'}`});
   let pairs=0,run=1,maxRun=1;for(let i=1;i<t.length;i++){if(t[i]===t[i-1]+1){pairs++;run++;maxRun=Math.max(maxRun,run)}else run=1}
-  s+=pairs*10+(maxRun>=3?15:0);f.push({ok:pairs===0,title:pairs?`${pairs} consecutive pair${pairs>1?'s':''}`:'No runs like 21-22-23',sub:'Sequences are a common pick'});
+  s+=pairs*10+(maxRun>=3?15:0);f.push({ok:pairs===0,title:pairs?`${pairs} consecutive pair${pairs>1?'s':''}`:'No runs like 21-22-23',sub:'Sequences are a commonly chosen pattern'});
   const d=t[1]-t[0];const even=t.every((x,i)=>i===0||x-t[i-1]===d);const mult=[5,7].some(m=>t.every(x=>x%m===0));if(even||mult)s+=30;
-  f.push({ok:!(even||mult),title:even||mult?'Neat pattern':'No neat pattern',sub:'Even steps and multiples are popular'});
+  f.push({ok:!(even||mult),title:even||mult?'Neat pattern':'No neat pattern',sub:'Even steps and multiples are commonly chosen'});
   const ov=last?t.filter(x=>last.nums.includes(x)).length:0;s+=ov*6;
-  f.push({ok:ov===0,warn:ov>0&&ov<3,title:ov?`${ov} number${ov>1?'s':''} from the last draw`:'Nothing from the last draw',sub:'Some players repeat last result'});
+  f.push({ok:ov===0,warn:ov>0&&ov<3,title:ov?`${ov} number${ov>1?'s':''} from the last result`:'Nothing from the last result',sub:'Repeating the last result is a common choice'});
   s=Math.min(100,s);const level=s<35?'Low':s<65?'Medium':'High';return{s,level,cls:s<35?'good':s<65?'mid':'bad',f}}
 function lowerRisk(t){const{N,k}=S;if(N<=31)return t;const r=mulberry32((Date.now()^0x9e37)>>>0);let cur=t.slice();
   for(let tries=0;tries<200&&crowdScore(cur).s>=35;tries++){const last=S.draws.at(-1)?.nums||[];
     let idx=cur.findIndex((x,i)=>i>0&&x===cur[i-1]+1);if(idx<0)idx=cur.findIndex(x=>last.includes(x));if(idx<0)idx=cur.findIndex(x=>x<=31);if(idx<0)idx=Math.floor(r()*k);
     let n;do{n=32+Math.floor(r()*(N-31))}while(cur.includes(n));cur[idx]=n;cur.sort((a,b)=>a-b)}return cur}
 
-/* saved tickets & money */
+/* saved number sets (statistical comparison only; never linked to money) */
 function myGroups(){return S.groups.filter(g=>g.game===S.game)}
 function resolve(g){const i=S.draws.findIndex(d=>drawKey(d)===g.after);if(g.after===''&&S.draws.length)return{state:'unknown'};if(i<0)return{state:'unknown'};const d=S.draws[i+1];return d?{state:'done',draw:d}:{state:'pending'}}
-function monthSpend(){const now=new Date();return S.groups.filter(g=>{const c=new Date(g.created);return c.getFullYear()===now.getFullYear()&&c.getMonth()===now.getMonth()}).reduce((a,g)=>a+g.tickets.length*g.price,0)}
-function yearTotals(){const y=new Date().getFullYear();let spent=0,won=0;S.groups.forEach(g=>{if(new Date(g.created).getFullYear()===y){spent+=g.tickets.length*g.price;won+=Number(g.won)||0}});return{spent,won}}
-function myRecord(){let checked=0,lost=0,hit=0;myGroups().forEach(g=>{const r=resolve(g);if(r.state!=='done')return;g.tickets.forEach(t=>{checked++;const m=t.filter(x=>r.draw.nums.includes(x)).length;if(m>=3)hit++;else lost++})});return{checked,lost,hit}}
+function myRecord(){let compared=0,low=0,hit=0;myGroups().forEach(g=>{const r=resolve(g);if(r.state!=='done')return;g.sets.forEach(t=>{compared++;const m=t.filter(x=>r.draw.nums.includes(x)).length;if(m>=3)hit++;else low++})});return{compared,low,hit}}
+/* self-reported spending log: entries the user types in; independent of number sets */
+const inMonth=(iso,now=new Date())=>{const c=new Date(iso);return c.getFullYear()===now.getFullYear()&&c.getMonth()===now.getMonth()};
+function monthSpend(){return S.log.filter(e=>inMonth(e.date)).reduce((a,e)=>a+(Number(e.spent)||0),0)}
+function yearTotals(){const y=new Date().getFullYear();let spent=0,won=0;S.log.forEach(e=>{if(new Date(e.date).getFullYear()===y){spent+=Number(e.spent)||0;won+=Number(e.won)||0}});return{spent,won}}
 
 /* ================= screens ================= */
 const ICON={back:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>',
@@ -253,9 +260,9 @@ const gameSelect=()=>`<label class="sr" style="position:absolute;width:1px;heigh
 
 function vHome(){const{k,N}=S;const last=S.draws.at(-1);const st=stats(S.draws.length);
   const p3=[...Array(k+1).keys()].filter(m=>m>=3).reduce((a,m)=>a+hyper(m,k,N),0);const per=Math.round(p3*1000);
-  const pend=myGroups().filter(g=>resolve(g).state==='pending');const tks=pend.flatMap(g=>g.tickets).slice(0,3);
+  const pend=myGroups().filter(g=>resolve(g).state==='pending');const tks=pend.flatMap(g=>g.sets).slice(0,3);
   const jack=Math.exp(lC(N,k));
-  return topBar('Draw Lab',`${GAMES[S.game].name} · ${k} of ${N}`,{right:`<a class="icon-btn" href="#budget" aria-label="Budget"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg></a>${gameSelect()}`})+
+  return topBar('Draw Lab',`${GAMES[S.game].name} · ${k} of ${N}`,{right:`<a class="icon-btn" href="#budget" aria-label="Spending log"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7a2 2 0 012-2h13v4M3 7v11a2 2 0 002 2h15V9H5a2 2 0 01-2-2z"/><circle cx="16" cy="14.5" r="1.2" fill="currentColor"/></svg></a>${gameSelect()}`})+
   `<main>
   <section class="hero">${ICON.ring}
     <div class="between"><span class="eyebrow">Latest draw</span><span class="mono soft" style="font-size:13px">${last?fmtDate(last.date):''}</span></div>
@@ -265,14 +272,14 @@ function vHome(){const{k,N}=S;const last=S.draws.at(-1);const st=stats(S.draws.l
   <section class="tiles">
     <a class="tile" href="#data" style="text-decoration:none;color:inherit"><span class="k">Draws</span><span class="v">${S.draws.length}</span><span class="s">analysed</span></a>
     <a class="tile" href="#insights" style="text-decoration:none;color:inherit"><span class="k">Fairness</span><span class="v" style="color:${st.pval<0.01?'#ff8a90':'#4fd38c'}">${st.pval<0.01?'Check':'Fair'}</span><span class="s">p = ${fmtP(st.pval)}</span></a>
-    <a class="tile" href="#outcomes" style="text-decoration:none;color:inherit"><span class="k">Jackpot</span><span class="v">1 in ${jack>=1e6?(jack/1e6).toFixed(jack>=1e7?0:1)+'M':Math.round(jack).toLocaleString()}</span><span class="s">per ticket</span></a>
+    <a class="tile" href="#outcomes" style="text-decoration:none;color:inherit"><span class="k">All ${k} match</span><span class="v">1 in ${jack>=1e6?(jack/1e6).toFixed(jack>=1e7?0:1)+'M':Math.round(jack).toLocaleString()}</span><span class="s">per combination</span></a>
   </section>
   <section class="card">
-    <div class="between"><h2>My tickets for the next draw</h2><a href="#checker" style="font-size:14px;font-weight:500;text-decoration:none">Checker</a></div>
-    ${tks.length?tks.map(t=>`<div class="balls">${t.map(x=>ball(x,'sm')).join('')}</div>`).join(''):'<p class="sub">No tickets saved yet. Generate some and tap "Save & check later".</p>'}
-    <a class="btn primary block" href="#tickets"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Generate tickets</a>
+    <div class="between"><h2>Saved number sets</h2><a href="#compare" style="font-size:14px;font-weight:500;text-decoration:none">Compare</a></div>
+    ${tks.length?tks.map(t=>`<div class="balls">${t.map(x=>ball(x,'sm')).join('')}</div>`).join(''):'<p class="sub">No number sets saved yet. Generate some and tap "Save sets for comparison".</p>'}
+    <a class="btn primary block" href="#sets"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Generate number sets</a>
   </section>
-  <section class="note">${ICON.info}<div style="display:flex;flex-direction:column;gap:6px"><p>${1000-per} of every 1,000 tickets match 2 numbers or fewer. Play for fun and set a budget.</p><a href="#outcomes" style="font-size:14px;font-weight:600;text-decoration:none">See wins &amp; losses</a></div></section>
+  <section class="note">${ICON.info}<div style="display:flex;flex-direction:column;gap:6px"><p>${1000-per} of every 1,000 possible combinations match 2 numbers or fewer. Every draw is random. If you play, set a budget.</p><a href="#outcomes" style="font-size:14px;font-weight:600;text-decoration:none">See odds &amp; outcomes</a></div></section>
   </main>`}
 
 function vInsights(){const P=S.period>=S.draws.length?S.draws.length:S.period;const st=stats(P);const{N,k}=S;
@@ -301,7 +308,7 @@ function vInsights(){const P=S.period>=S.draws.length?S.draws.length:S.period;co
   </main>`}
 
 function vTest(){const bt=backtest();const{res,mu,T}=bt;const thr=0.05/(res.length-1);const beat=res.filter(r=>r.id!=='random'&&r.z>0&&r.p<thr);
-  return topBar('Strategy test',`Each strategy picked one ticket for ${T} past draws, using only earlier results.`)+`<main>
+  return topBar('Strategy test',`Each strategy picked one number set for ${T} past draws, using only earlier results.`)+`<main>
   <section class="hero" style="gap:6px">${ICON.ring}
     <span class="eyebrow">Verdict</span>
     <p style="margin:0;font-family:var(--f-display);font-size:21px;font-weight:600;line-height:1.25">${!T?'Load more draws to run the test.':beat.length?`${esc(beat.map(b=>b.name).join(', '))} beat chance this time.`:'No strategy beat random picks.'}</p>
@@ -317,96 +324,85 @@ function vTest(){const bt=backtest();const{res,mu,T}=bt;const thr=0.05/(res.leng
     <button class="btn outline block" data-act="rerun">Run test again</button></section>
   </main>`}
 
-function genTickets(){const{k,N,draws}=S;const g=S.gen;const r=mulberry32((Date.now()^(Math.random()*1e9))>>>0);
+function genSets(){const{k,N,draws}=S;const g=S.gen;const r=mulberry32((Date.now()^(Math.random()*1e9))>>>0);
   const cnt=new Array(N+1).fill(0),last=new Array(N+1).fill(-1);const t=draws.length;draws.forEach((d,i)=>d.nums.forEach(x=>{last[x]=i;if(i>=t-S.win)cnt[x]++}));
-  const out=[],seen=new Set();for(let i=0;i<g.count;i++){let tk,n=0;do{tk=pickTicket(g.strategy,{k,N,cnt,last,t},r);n++}while(n<300&&((g.avoid&&crowdScore(tk).s>=35)||seen.has(tk.join())));seen.add(tk.join());out.push(tk)}g.tickets=out;save()}
-function vTickets(){const g=S.gen;if(!g.tickets.length||g.tickets[0].length!==S.k)genTickets();
-  return topBar('Tickets',`For ${GAMES[S.game].name}, next draw`)+`<main>
+  const out=[],seen=new Set();for(let i=0;i<g.count;i++){let tk,n=0;do{tk=pickSet(g.strategy,{k,N,cnt,last,t},r);n++}while(n<300&&((g.avoid&&crowdScore(tk).s>=35)||seen.has(tk.join())));seen.add(tk.join());out.push(tk)}g.sets=out;save()}
+function vSets(){const g=S.gen;if(!g.sets.length||g.sets[0].length!==S.k)genSets();
+  return topBar('Number sets',`${GAMES[S.game].name} · ${S.k} of ${S.N} · statistical sampling`)+`<main>
   <section class="card">
-    <div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Strategy</span><div class="chips">${STRATS.map(s=>`<button data-act="strat" data-v="${s.id}" aria-pressed="${g.strategy===s.id}">${s.chip}</button>`).join('')}</div></div>
-    <div class="between"><span style="font-weight:500">Number of tickets</span><div class="stepper"><button aria-label="Fewer tickets" data-act="count" data-v="-1">−</button><span>${g.count}</span><button aria-label="More tickets" data-act="count" data-v="1">+</button></div></div>
-    <label class="between" style="cursor:pointer"><span style="display:flex;flex-direction:column"><span style="font-weight:500">Avoid popular patterns</span><span class="sub" style="font-size:12.5px">Fewer people to share a prize with</span></span><input id="avoid" type="checkbox" ${g.avoid?'checked':''} data-chg="avoid"></label>
-    <button class="btn primary block" data-act="generate">Generate tickets</button>
+    <div style="display:flex;flex-direction:column;gap:8px"><span class="eyebrow">Sampling method</span><div class="chips">${STRATS.map(s=>`<button data-act="strat" data-v="${s.id}" aria-pressed="${g.strategy===s.id}">${s.chip}</button>`).join('')}</div></div>
+    <div class="between"><span style="font-weight:500">How many sets</span><div class="stepper"><button aria-label="Fewer sets" data-act="count" data-v="-1">−</button><span>${g.count}</span><button aria-label="More sets" data-act="count" data-v="1">+</button></div></div>
+    <label class="between" style="cursor:pointer"><span style="display:flex;flex-direction:column"><span style="font-weight:500">Skip common patterns</span><span class="sub" style="font-size:12.5px">Leaves out date-range-only sets, runs and even steps</span></span><input id="avoid" type="checkbox" ${g.avoid?'checked':''} data-chg="avoid"></label>
+    <button class="btn primary block" data-act="generate">Generate number sets</button>
   </section>
   <section class="card flush">
-    <div class="list">${g.tickets.map((t,i)=>{const c=crowdScore(t);return `<div class="item" style="justify-content:flex-start"><span class="mono" style="font-size:12px;color:var(--muted);width:18px">${String(i+1).padStart(2,'0')}</span><div class="balls" style="gap:5px;flex:1;flex-wrap:nowrap">${t.map(x=>ball(x,'sm')).join('')}</div><a class="pill ${c.cls}" href="#score" data-act="score" data-v="${i}" aria-label="Prize-sharing risk ${c.level}, ${c.s} of 100. Open details">${c.level==='Medium'?'Med':c.level}</a></div>`}).join('')}</div>
-    <div class="row" style="padding:12px 0"><button class="btn" style="flex:1" data-act="copy">Copy</button><button class="btn outline" style="flex:1" data-act="saveTickets">Save &amp; check later</button></div>
+    <div class="list">${g.sets.map((t,i)=>{const c=crowdScore(t);return `<div class="item" style="justify-content:flex-start"><span class="mono" style="font-size:12px;color:var(--muted);width:18px">${String(i+1).padStart(2,'0')}</span><div class="balls" style="gap:5px;flex:1;flex-wrap:nowrap">${t.map(x=>ball(x,'sm')).join('')}</div><a class="pill ${c.cls}" href="#score" data-act="score" data-v="${i}" aria-label="Pattern popularity ${c.level}, ${c.s} of 100. Open details">${c.level==='Medium'?'Med':c.level}</a></div>`}).join('')}</div>
+    <div class="row" style="padding:12px 0"><button class="btn" style="flex:1" data-act="copy">Copy</button><button class="btn outline" style="flex:1" data-act="saveSets">Save sets for comparison</button></div>
   </section>
-  <p class="sub" style="text-align:center">${money(S.price)} per ticket · ${money(S.price*g.count)} for this set · <a href="#budget">budget</a></p>
+  <p class="sub" style="text-align:center">Random sampling cannot predict results. Every combination is equally likely to be drawn.</p>
   </main>`}
 
-function vScore(){if(!S.gen.tickets.length||S.gen.tickets[0].length!==S.k)genTickets();let t=S.scoreRef!=null?S.gen.tickets[S.scoreRef]:null;if(!t){t=S.gen.tickets[0]||sampleK(S.N,S.k,Math.random);S.scoreRef=0}
+function vScore(){if(!S.gen.sets.length||S.gen.sets[0].length!==S.k)genSets();let t=S.scoreRef!=null?S.gen.sets[S.scoreRef]:null;if(!t){t=S.gen.sets[0]||sampleK(S.N,S.k,Math.random);S.scoreRef=0}
   const c=crowdScore(t);const col={good:'#4fd38c',mid:'#e0b04a',bad:'#ff8a90'}[c.cls];
-  return topBar('Prize-sharing score','How many others might pick the same numbers',{back:'tickets'})+`<main>
+  return topBar('Pattern popularity','How common this pattern is among chosen numbers',{back:'sets'})+`<main>
   <section class="card" style="border-radius:20px;gap:14px">
     <div class="balls">${t.map(x=>ball(x)).join('')}</div>
-    <div class="between" style="align-items:flex-end"><div style="display:flex;flex-direction:column"><span class="eyebrow">Crowd risk</span><span style="font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1.1;color:${col}">${c.level}</span></div><span class="mono" style="font-weight:600;font-size:28px">${c.s}<span style="font-size:15px;color:var(--muted)">/100</span></span></div>
+    <div class="between" style="align-items:flex-end"><div style="display:flex;flex-direction:column"><span class="eyebrow">Popularity</span><span style="font-family:var(--f-display);font-weight:800;font-size:34px;line-height:1.1;color:${col}">${c.level}</span></div><span class="mono" style="font-weight:600;font-size:28px">${c.s}<span style="font-size:15px;color:var(--muted)">/100</span></span></div>
     <div class="meter" role="img" aria-label="Score ${c.s} out of 100"><span style="flex:35;border-radius:6px 0 0 6px;background:#1f5e3d"></span><span style="flex:30;background:#6b5418"></span><span style="flex:35;border-radius:0 6px 6px 0;background:#6e1a20"></span><i class="mark" style="left:${c.s}%"></i></div>
     <div class="between" style="font-size:11.5px;color:var(--muted)"><span>Low</span><span>Medium</span><span>High</span></div>
   </section>
   <section class="card flush"><div class="list">${c.f.map(f=>`<div class="item" style="justify-content:flex-start">${f.ok?ICON.ok:f.warn?ICON.warn:ICON.bad}<div class="t"><span>${f.title}</span><span class="s">${f.sub}</span></div></div>`).join('')}</div></section>
-  <section class="note">${ICON.info}<p>This score does not change your chance of winning. It lowers the chance of splitting a prize with many others.</p></section>
-  <div class="row"><a class="btn" style="flex:1" href="#tickets">Keep ticket</a><button class="btn primary" style="flex:1" data-act="lower" ${c.s<35?'disabled':''}>Lower the risk</button></div>
+  <section class="note">${ICON.info}<p>This is a statistic about human number choices. It does not change any combination's chance of being drawn, and it is not a strategy for winning.</p></section>
+  <div class="row"><a class="btn" style="flex:1" href="#sets">Keep set</a><button class="btn primary" style="flex:1" data-act="lower" ${c.s<35?'disabled':''}>Make less common</button></div>
   </main>`}
 
-function vChecker(){const gs=myGroups().slice().reverse();const done=gs.map(g=>({g,r:resolve(g)}));
+function vCompare(){const gs=myGroups().slice().reverse();const done=gs.map(g=>({g,r:resolve(g)}));
   const latest=done.find(x=>x.r.state==='done');let sum='';
-  if(latest){const nums=latest.r.draw.nums;const ms=latest.g.tickets.map(t=>t.filter(x=>nums.includes(x)).length);
-    sum=`<section class="hero">${ICON.ring}<span class="eyebrow">Result · ${fmtDate(latest.r.draw.date)}</span><div class="balls">${nums.map(x=>ball(x,'ringed')).join('')}</div><div class="row wrap" style="gap:16px;font-size:13.5px"><span><b class="mono">${ms.length}</b> checked</span><span><b class="mono">${ms.filter(m=>m>=3).length}</b> matched 3+</span><span><b class="mono">${ms.filter(m=>m<3).length}</b> no prize</span></div></section>`}
+  if(latest){const nums=latest.r.draw.nums;const ms=latest.g.sets.map(t=>t.filter(x=>nums.includes(x)).length);
+    sum=`<section class="hero">${ICON.ring}<span class="eyebrow">Result · ${fmtDate(latest.r.draw.date)}</span><div class="balls">${nums.map(x=>ball(x,'ringed')).join('')}</div><div class="row wrap" style="gap:16px;font-size:13.5px"><span><b class="mono">${ms.length}</b> compared</span><span><b class="mono">${ms.filter(m=>m>=3).length}</b> matched 3+</span><span><b class="mono">${ms.filter(m=>m<3).length}</b> matched 2 or fewer</span></div></section>`}
   const body=done.length?done.map(({g,r})=>{const nums=r.state==='done'?r.draw.nums:null;
-    return `<section class="card flush"><div class="between" style="padding:12px 0 4px"><span style="font-weight:600">${r.state==='done'?'Draw '+fmtDate(r.draw.date):r.state==='pending'?'Waiting for next draw':'Draw not in loaded history'}</span><span class="sub">${g.tickets.length} ticket${g.tickets.length>1?'s':''}</span></div>
-    <div class="list">${g.tickets.map((t,i)=>{const m=nums?t.filter(x=>nums.includes(x)).length:null;return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px"><div class="between"><span class="mono" style="font-size:12px;color:var(--muted)">Ticket ${i+1}</span>${m===null?'<span class="pill">Pending</span>':`<span class="pill ${m>=3?'good':''}">${m>=3?'Matched '+m:m===0?'No match':'Matched '+m+' · no prize'}</span>`}</div><div class="balls">${t.map(x=>ball(x,'md '+(nums?(nums.includes(x)?'hit':'miss'):''))).join('')}</div></div>`}).join('')}</div>
-    ${r.state==='done'?`<label class="between" style="padding:10px 0 12px;gap:12px"><span class="sub" style="font-size:13.5px">Prize won for this draw (${esc(S.cur)})</span><input type="number" min="0" step="any" value="${Number(g.won)||0}" data-chg="won" data-v="${g.id}" style="width:110px;height:40px;border:1px solid var(--line3);border-radius:10px;background:var(--card2);padding:0 10px;font-family:var(--f-mono)"></label>`:''}
-    <div style="padding-bottom:10px"><button class="btn" style="height:40px;font-size:13.5px" data-act="delGroup" data-v="${g.id}">Remove</button></div></section>`}).join(''):`<section class="card"><p class="sub">No saved tickets yet. On the Tickets screen tap "Save &amp; check later". They are checked automatically when the next result is added.</p><a class="btn primary" href="#tickets">Go to tickets</a></section>`;
-  return topBar('Ticket checker','Saved tickets against each new result',{back:'tickets'})+`<main>${sum}${body}
-  <section class="card"><h2>Add the latest result</h2><p class="sub">Enter the ${S.k} main numbers once the draw is out. Saved tickets are checked straight away.</p>
-    <div class="grid2"><label class="field">Draw date<input id="resDate" type="date"></label><label class="field">Numbers<input id="resNums" type="text" inputmode="numeric" placeholder="3 11 19 27 38 45"></label></div>
+    return `<section class="card flush"><div class="between" style="padding:12px 0 4px"><span style="font-weight:600">${r.state==='done'?'Result '+fmtDate(r.draw.date):r.state==='pending'?'Waiting for a new result':'Result not in loaded history'}</span><span class="sub">${g.sets.length} set${g.sets.length>1?'s':''}</span></div>
+    <div class="list">${g.sets.map((t,i)=>{const m=nums?t.filter(x=>nums.includes(x)).length:null;return `<div class="item" style="flex-direction:column;align-items:stretch;gap:8px"><div class="between"><span class="mono" style="font-size:12px;color:var(--muted)">Set ${i+1}</span>${m===null?'<span class="pill">Pending</span>':`<span class="pill ${m>=3?'good':''}">${m===0?'No match':'Matched '+m}</span>`}</div><div class="balls">${t.map(x=>ball(x,'md '+(nums?(nums.includes(x)?'hit':'miss'):''))).join('')}</div></div>`}).join('')}</div>
+    <div style="padding:10px 0"><button class="btn" style="height:40px;font-size:13.5px" data-act="delGroup" data-v="${g.id}">Remove</button></div></section>`}).join(''):`<section class="card"><p class="sub">No saved number sets yet. On the Number sets screen tap "Save sets for comparison". They are compared automatically when you add a new result.</p><a class="btn primary" href="#sets">Go to number sets</a></section>`;
+  return topBar('Result comparison','Saved number sets against each new result',{back:'sets'})+`<main>${sum}${body}
+  <section class="card"><h2>Add a new result</h2><p class="sub">Enter the ${S.k} main numbers of a published result. Saved sets are compared straight away.</p>
+    <div class="grid2"><label class="field">Result date<input id="resDate" type="date"></label><label class="field">Numbers<input id="resNums" type="text" inputmode="numeric" placeholder="3 11 19 27 38 45"></label></div>
     <button class="btn outline block" data-act="addResult">Add result</button>
-    <p class="sub" style="font-size:12.5px">Prize amounts depend on the operator's tiers. Confirm any win with the official result.</p></section>
+    <p class="sub" style="font-size:12.5px">This is a statistical comparison only. Official results come from the lottery operator.</p></section>
   </main>`}
 
-function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N);const per=Math.round(p3*1000);const me=myRecord();const yt=yearTotals();
-  const rows=[];for(let m=3;m<=k;m++)rows.push(`<div class="item"><span${m===k?' style="font-weight:600"':''}>${m===k?'Jackpot, all '+k:'Match '+m+' numbers'}</span><span class="mono" style="font-size:14px;color:${m===k?'var(--red-ink)':'var(--muted)'};font-weight:${m===k?600:400}">${oneIn(hyper(m,k,N))}</span></div>`);
-  return topBar('Wins &amp; losses',`What happens to ${GAMES[S.game].name} tickets`,{back:'home'})+`<main>
-  <section class="hero" style="gap:12px"><span class="eyebrow">Out of every 1,000 tickets</span>
+function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N);const per=Math.round(p3*1000);const me=myRecord();
+  const rows=[];for(let m=0;m<=k;m++)rows.push(`<div class="item"><span${m===k?' style="font-weight:600"':''}>${m===k?'All '+k+' numbers':'Exactly '+m+' number'+(m===1?'':'s')}</span><span class="mono" style="font-size:14px;color:${m===k?'var(--red-ink)':'var(--muted)'};font-weight:${m===k?600:400}">${oneIn(hyper(m,k,N))}</span></div>`);
+  return topBar('Odds &amp; outcomes',`Probability for ${GAMES[S.game].name}, ${k} of ${N}`,{back:'home'})+`<main>
+  <section class="hero" style="gap:12px"><span class="eyebrow">Out of every 1,000 possible combinations</span>
     <div class="row" style="gap:22px;align-items:baseline"><div style="display:flex;flex-direction:column"><span class="big">${1000-per}</span><span class="soft" style="font-size:13px">match 2 or fewer</span></div><div style="display:flex;flex-direction:column"><span class="big">${per}</span><span class="soft" style="font-size:13px">match 3 or more</span></div></div>
     <div class="split" role="img" aria-label="${1000-per} of 1,000 match 2 or fewer; ${per} match 3 or more"><div style="width:${100-per/10}%;background:#2a0508"></div><div style="width:${per/10}%;min-width:6px;background:#fff"></div></div></section>
-  <section class="card flush"><div class="list">${rows.join('')}</div></section>
-  <section class="card"><h2>Your checked tickets</h2>
-    ${me.checked?`<div class="tiles"><div class="tile"><span class="k">Checked</span><span class="v">${me.checked}</span></div><div class="tile"><span class="k">Lost</span><span class="v" style="color:#ff8a90">${me.lost}</span></div><div class="tile"><span class="k">Matched 3+</span><span class="v" style="color:#4fd38c">${me.hit}</span></div></div>
-    <p class="sub">This year: spent ${money(yt.spent)}, won ${money(yt.won)}.</p>`:'<p class="sub">Save tickets and add results in the checker to see your own record here. It stays on this phone.</p>'}
+  <section class="card flush"><div class="between" style="padding:10px 0 4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600"><span>Numbers matched</span><span>Chance</span></div><div class="list">${rows.join('')}</div></section>
+  <section class="card"><h2>Your saved sets</h2>
+    ${me.compared?`<div class="tiles"><div class="tile"><span class="k">Compared</span><span class="v">${me.compared}</span></div><div class="tile"><span class="k">2 or fewer</span><span class="v" style="color:#ff8a90">${me.low}</span></div><div class="tile"><span class="k">3 or more</span><span class="v" style="color:#4fd38c">${me.hit}</span></div></div>
+    <p class="sub">Your results so far against the expected ${1000-per} in 1,000.</p>`:'<p class="sub">Save number sets and add results to compare them here. It stays on this phone.</p>'}
   </section></main>`}
 
 function vBudget(){const sp=monthSpend();const pct=S.limit>0?Math.min(100,sp/S.limit*100):0;const yt=yearTotals();const net=yt.won-yt.spent;
   const now=new Date();const reset=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-  const entries=S.groups.slice().reverse().slice(0,8);
-  return topBar('Budget','Spending against prizes',{back:'home'})+`<main>
+  const entries=S.log.slice().sort((a,b)=>b.date.localeCompare(a.date)).slice(0,12);
+  return topBar('Spending log','A private record of what you spend on lotteries elsewhere',{back:'home'})+`<main>
   <section class="hero">${ICON.ring}<div class="between"><span class="eyebrow">${now.toLocaleDateString('en-GB',{month:'long'})} limit</span><span class="mono soft" style="font-size:13px">${money(S.limit)}</span></div>
     <div class="row" style="align-items:baseline;gap:8px"><span class="big" style="font-size:34px">${money(sp)}</span><span class="soft">spent</span></div>
     <div class="progress" role="img" aria-label="${Math.round(pct)} percent of the monthly limit used"><div style="width:${pct}%;${pct>=100?'background:#ffd6d8':''}"></div></div>
-    <span style="font-size:13.5px">${sp>=S.limit?'Limit reached':money(S.limit-sp)+' left'} · resets ${reset}</span></section>
-  <section class="tiles"><div class="tile"><span class="k">Spent ${now.getFullYear()}</span><span class="v">${yt.spent.toLocaleString()}</span></div><div class="tile"><span class="k">Won ${now.getFullYear()}</span><span class="v" style="color:#4fd38c">${yt.won.toLocaleString()}</span></div><div class="tile"><span class="k">Net</span><span class="v" style="color:${net<0?'#ff8a90':'#4fd38c'}">${net<0?'−':''}${Math.abs(net).toLocaleString()}</span></div></section>
-  <section class="card flush"><div class="list">${entries.length?entries.map(g=>{const r=resolve(g);return `<div class="item"><div class="t"><span>${new Date(g.created).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${GAMES[g.game]?.name||''}</span><span class="s">${g.tickets.length} tickets · ${r.state==='done'?'checked':'waiting for result'}</span></div><span class="mono">−${(g.tickets.length*g.price).toLocaleString()}${Number(g.won)?` <span style="color:#4fd38c">+${Number(g.won).toLocaleString()}</span>`:''}</span></div>`}).join(''):'<div class="item"><span class="sub">Saved tickets appear here with their cost.</span></div>'}</div></section>
+    <span style="font-size:13.5px">${S.limit>0&&sp>=S.limit?'Limit reached. Consider taking a break.':money(Math.max(0,S.limit-sp))+' left'} · resets ${reset}</span></section>
+  <section class="tiles"><div class="tile"><span class="k">Spent ${now.getFullYear()}</span><span class="v">${yt.spent.toLocaleString()}</span></div><div class="tile"><span class="k">Returned</span><span class="v">${yt.won.toLocaleString()}</span></div><div class="tile"><span class="k">Net</span><span class="v" style="color:${net<0?'#ff8a90':'#4fd38c'}">${net<0?'−':''}${Math.abs(net).toLocaleString()}</span></div></section>
+  <section class="card"><h2>Add an entry</h2>
+    <div class="grid2"><label class="field">Date<input id="logDate" type="date"></label><label class="field">Spent (${esc(S.cur)})<input id="logSpent" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label></div>
+    <label class="field">Returned to you (${esc(S.cur)}, optional)<input id="logWon" type="number" min="0" step="any" inputmode="decimal" placeholder="0"></label>
+    <button class="btn outline block" data-act="addLog">Add entry</button>
+    <p class="sub" style="font-size:12.5px">The app never buys, sells or pays anything. This log only holds figures you type in.</p></section>
+  <section class="card flush"><div class="list">${entries.length?entries.map(e=>`<div class="item"><div class="t"><span>${fmtDate(e.date)}</span></div><span class="mono">−${(Number(e.spent)||0).toLocaleString()}${Number(e.won)?` <span style="color:#4fd38c">+${Number(e.won).toLocaleString()}</span>`:''} <button class="icon-btn" style="width:32px;height:32px;border-radius:16px;margin-left:6px" aria-label="Delete entry" data-act="delLog" data-v="${e.id}">×</button></span></div>`).join(''):'<div class="item"><span class="sub">Entries you add appear here.</span></div>'}</div></section>
   <section class="card"><h2>Settings</h2>
-    <div class="grid2"><label class="field">Monthly limit<input id="limit" type="number" min="0" step="any" value="${S.limit}" data-chg="limit"></label><label class="field">Ticket price<input id="price" type="number" min="0" step="any" value="${S.price}" data-chg="price"></label></div>
-    <label class="field">Currency<input id="cur" type="text" maxlength="4" value="${esc(S.cur)}" data-chg="cur"></label>
-    <label class="between" style="gap:12px"><span>Remind me at 80% of my limit</span><input id="remind" type="checkbox" ${S.remind?'checked':''} data-chg="remind"></label>
-    <label class="between" style="gap:12px"><span>Block saving tickets over the limit</span><input id="pause" type="checkbox" ${S.pauseOver?'checked':''} data-chg="pauseOver"></label>
+    <div class="grid2"><label class="field">Monthly limit<input id="limit" type="number" min="0" step="any" value="${S.limit}" data-chg="limit"></label><label class="field">Currency<input id="cur" type="text" maxlength="4" value="${esc(S.cur)}" data-chg="cur"></label></div>
+    <label class="between" style="gap:12px"><span>Warn me at 80% of my limit</span><input id="remind" type="checkbox" ${S.remind?'checked':''} data-chg="remind"></label>
   </section>
-  <a class="btn block" href="#syndicate" style="justify-content:space-between">Play with a group? Syndicate splitter${ICON.chev}</a>
-  </main>`}
-
-function vSyndicate(){const s=S.syn;const pot=s.members.reduce((a,m)=>a+(Number(m.paid)||0),0);const colors=['#e3222f','#2b62c6','#1d9452','#9a6a00','#7a4bbd','#c4502f'];
-  return topBar(esc(s.name),`${s.members.length} member${s.members.length>1?'s':''} · pot ${money(pot)}`,{back:'budget'})+`<main>
-  <section class="hero" style="gap:10px"><label class="eyebrow" for="synPrize">If the group wins (${esc(S.cur)})</label>
-    <input id="synPrize" type="number" min="0" step="any" value="${Number(s.prize)||0}" data-inp="synPrize" style="height:52px;border:0;border-radius:12px;padding:0 14px;background:rgba(0,0,0,.3);color:#fff;font:600 24px var(--f-mono)">
-    <span class="soft" style="font-size:13px">Split by what each member paid in</span></section>
-  <section class="card flush"><div class="list" id="synList">${s.members.map((m,i)=>{const share=pot?(Number(m.paid)||0)/pot:0;return `<div class="item" style="gap:8px"><span class="row" style="gap:10px;min-width:0;flex:1"><span style="width:30px;height:30px;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#fff;background:${colors[i%colors.length]}">${esc((m.name||'?')[0].toUpperCase())}</span><input aria-label="Member name" value="${esc(m.name)}" data-chg="synName" data-v="${i}" style="min-width:0;flex:1;height:36px;border:1px solid transparent;border-radius:8px;background:transparent;padding:0 6px"></span>
-    <label class="mono" style="display:flex;align-items:center;gap:4px;font-size:13px"><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Paid</span><input type="number" min="0" step="any" value="${Number(m.paid)||0}" data-chg="synPaid" data-v="${i}" style="width:64px;height:36px;border:1px solid var(--line3);border-radius:8px;background:var(--card2);padding:0 6px;text-align:right;font-family:var(--f-mono)"></label>
-    <span class="mono" style="width:44px;text-align:right;font-size:13px;color:var(--muted)">${Math.round(share*100)}%</span><span class="mono syn-get" style="width:76px;text-align:right;font-weight:600;color:#4fd38c">${(share*(Number(s.prize)||0)).toFixed(2)}</span>
-    <button class="icon-btn" style="width:36px;height:36px;border-radius:18px" aria-label="Remove ${esc(m.name)}" data-act="synDel" data-v="${i}">×</button></div>`}).join('')}</div></section>
-  <label class="field">Group name<input id="synNm" type="text" value="${esc(s.name)}" data-chg="synGroup"></label>
-  <div class="row"><button class="btn" style="flex:1" data-act="synAdd">Add member</button><button class="btn primary" style="flex:1" data-act="synCopy">Copy summary</button></div>
+  <section class="note">${ICON.info}<p>Lotteries are designed so that players lose money on average. Only spend what you can afford to lose.</p></section>
   </main>`}
 
 function vData(){const last=S.draws.slice(-15).reverse();return topBar('Draw history',`${S.draws.length} draws · ${S.source==='sample'?'simulated sample':'your data'}`,{back:'home'})+`<main>
@@ -419,10 +415,12 @@ function vData(){const last=S.draws.slice(-15).reverse();return topBar('Draw his
   </main>`}
 
 /* ================= router ================= */
-const VIEWS={home:vHome,insights:vInsights,test:vTest,tickets:vTickets,score:vScore,checker:vChecker,outcomes:vOutcomes,budget:vBudget,syndicate:vSyndicate,data:vData};
-const PARENT={score:'tickets',checker:'tickets',outcomes:'home',budget:'home',syndicate:'home',data:'home'};
+const VIEWS={home:vHome,insights:vInsights,test:vTest,sets:vSets,score:vScore,compare:vCompare,outcomes:vOutcomes,budget:vBudget,data:vData};
+const PARENT={score:'sets',compare:'sets',outcomes:'home',budget:'home',data:'home'};
+/* routes renamed in v1; the syndicate screen was removed */
+const LEGACY={tickets:'sets',checker:'compare',syndicate:'home'};
 let current='home';
-function render(keepScroll){const h=location.hash.slice(1);current=VIEWS[h]?h:'home';const y=window.scrollY;
+function render(keepScroll){let h=location.hash.slice(1);if(LEGACY[h]){history.replaceState(null,'','#'+LEGACY[h]);h=LEGACY[h]}current=VIEWS[h]?h:'home';const y=window.scrollY;
   $('#screen').innerHTML=VIEWS[current]();const tab=PARENT[current]||current;
   document.querySelectorAll('#tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===tab?'page':'false'));
   window.scrollTo(0,keepScroll?y:0)}
@@ -441,43 +439,38 @@ function parseRows(text,newestFirst){const out=[];let skipped=0;const DATE=/(\d{
 const ACT={
   period:el=>{S.period=+el.dataset.v;save();render(true)},
   rerun:()=>{btCache=null;render(true);toast('Test re-run.')},
-  strat:el=>{S.gen.strategy=el.dataset.v;genTickets();render(true)},
-  count:el=>{S.gen.count=Math.max(1,Math.min(10,S.gen.count+ +el.dataset.v));genTickets();render(true)},
-  generate:()=>{genTickets();render(true)},
+  strat:el=>{S.gen.strategy=el.dataset.v;genSets();render(true)},
+  count:el=>{S.gen.count=Math.max(1,Math.min(10,S.gen.count+ +el.dataset.v));genSets();render(true)},
+  generate:()=>{genSets();render(true)},
   score:(el,e)=>{e.preventDefault();S.scoreRef=+el.dataset.v;location.hash='score'},
-  lower:()=>{const i=S.scoreRef??0;S.gen.tickets[i]=lowerRisk(S.gen.tickets[i]);save();render(true);toast('Ticket updated.')},
-  copy:()=>copyText(S.gen.tickets.map(t=>t.join(' ')).join('\n'),'Tickets copied.'),
-  saveTickets:()=>{const cost=S.gen.tickets.length*S.price;const sp=monthSpend();
-    if(S.pauseOver&&S.limit>0&&sp+cost>S.limit){toast(`That would pass your ${money(S.limit)} monthly limit. Change it in Budget.`);return}
-    S.groups.push({id:Date.now().toString(36),game:S.game,after:drawKey(S.draws.at(-1)),tickets:S.gen.tickets.map(t=>t.slice()),price:S.price,created:new Date().toISOString(),won:0});save();
-    const after=sp+cost;toast(S.remind&&S.limit>0&&after>=0.8*S.limit?`Saved. You have used ${Math.round(after/S.limit*100)}% of this month's limit.`:'Saved. They will be checked when the next result is added.')},
+  lower:()=>{const i=S.scoreRef??0;S.gen.sets[i]=lowerRisk(S.gen.sets[i]);save();render(true);toast('Set updated.')},
+  copy:()=>copyText(S.gen.sets.map(t=>t.join(' ')).join('\n'),'Number sets copied.'),
+  saveSets:()=>{S.groups.push({id:Date.now().toString(36),game:S.game,after:drawKey(S.draws.at(-1)),sets:S.gen.sets.map(t=>t.slice()),created:new Date().toISOString()});save();
+    toast('Saved. They will be compared when you add a new result.')},
   delGroup:el=>{S.groups=S.groups.filter(g=>g.id!==el.dataset.v);save();render(true)},
   addResult:()=>{const nums=[...new Set((($('#resNums').value||'').match(/\d+/g)||[]).map(Number).filter(v=>v>=1&&v<=S.N))];
     if(nums.length!==S.k){toast(`Enter exactly ${S.k} different numbers from 1 to ${S.N}.`);return}
-    const date=$('#resDate').value||new Date().toISOString().slice(0,10);S.draws.push({date,nums:nums.sort((a,b)=>a-b)});if(S.source==='sample')S.source='mixed';btCache=null;save();render(false);toast('Result added and tickets checked.')},
+    const date=$('#resDate').value||new Date().toISOString().slice(0,10);S.draws.push({date,nums:nums.sort((a,b)=>a-b)});if(S.source==='sample')S.source='mixed';btCache=null;save();render(false);toast('Result added and saved sets compared.')},
   import:()=>{const{out,skipped}=parseRows($('#paste').value,$('#newest').checked);if(out.length<20){toast(`Found ${out.length} valid draws. Add at least 20 rows with ${S.k} numbers each.`);return}
     S.draws=out;S.source='import';btCache=null;save();render(false);toast(`Imported ${out.length} draws${skipped?`, skipped ${skipped} rows`:''}.`)},
   sample:()=>{loadSample();save();render(false);toast('Loaded the simulated sample.')},
-  synAdd:()=>{S.syn.members.push({name:'Member '+(S.syn.members.length+1),paid:0});save();render(true)},
-  synDel:el=>{S.syn.members.splice(+el.dataset.v,1);if(!S.syn.members.length)S.syn.members.push({name:'You',paid:0});save();render(true)},
-  synCopy:()=>{const s=S.syn,pot=s.members.reduce((a,m)=>a+(Number(m.paid)||0),0);const lines=s.members.map(m=>{const sh=pot?(Number(m.paid)||0)/pot:0;return `${m.name}: paid ${money(m.paid||0)}, ${Math.round(sh*100)}%, gets ${money((sh*(Number(s.prize)||0)).toFixed(2))}`});copyText(`${s.name} — prize ${money(s.prize||0)}\n`+lines.join('\n'),'Summary copied.')}
+  addLog:()=>{const spent=Math.max(0,+$('#logSpent').value||0),won=Math.max(0,+$('#logWon').value||0);
+    if(!spent&&!won){toast('Enter an amount spent or returned.');return}
+    const date=$('#logDate').value||new Date().toISOString().slice(0,10);const before=monthSpend();
+    S.log.push({id:Date.now().toString(36),date,spent,won});save();render(true);const after=monthSpend();
+    toast(S.remind&&S.limit>0&&inMonth(date)&&after>=0.8*S.limit&&before<S.limit?`Entry added. You have used ${Math.round(after/S.limit*100)}% of this month's limit.`:'Entry added.')},
+  delLog:el=>{S.log=S.log.filter(e=>e.id!==el.dataset.v);save();render(true)}
 };
 const CHG={
-  game:el=>{S.game=el.value;const g=GAMES[S.game];S.k=g.k;S.N=g.N;S.price=g.price;S.cur=g.cur;S.gen.tickets=[];loadSample();save();render(false);toast(`Switched to ${g.name}. Import its real results in Draw history.`)},
+  game:el=>{S.game=el.value;const g=GAMES[S.game];S.k=g.k;S.N=g.N;S.cur=g.cur;S.gen.sets=[];loadSample();save();render(false);toast(`Switched to ${g.name}. Import its real results in Draw history.`)},
   win:el=>{S.win=Math.max(10,+el.value||100)},warm:el=>{S.warm=Math.max(10,+el.value||50)},
-  avoid:el=>{S.gen.avoid=el.checked;genTickets();render(true)},
-  won:el=>{const g=S.groups.find(x=>x.id===el.dataset.v);if(g){g.won=Math.max(0,+el.value||0);save();toast('Prize saved.')}},
-  limit:el=>{S.limit=Math.max(0,+el.value||0);save();render(true)},price:el=>{S.price=Math.max(0,+el.value||0);save();render(true)},
-  cur:el=>{S.cur=el.value.trim()||'$';save();render(true)},remind:el=>{S.remind=el.checked;save()},pauseOver:el=>{S.pauseOver=el.checked;save()},
-  synName:el=>{S.syn.members[+el.dataset.v].name=el.value.trim()||'Member';save();render(true)},
-  synPaid:el=>{S.syn.members[+el.dataset.v].paid=Math.max(0,+el.value||0);save();render(true)},
-  synGroup:el=>{S.syn.name=el.value.trim()||'My syndicate';save();render(true)},
+  avoid:el=>{S.gen.avoid=el.checked;genSets();render(true)},
+  limit:el=>{S.limit=Math.max(0,+el.value||0);save();render(true)},
+  cur:el=>{S.cur=el.value.trim()||'$';save();render(true)},remind:el=>{S.remind=el.checked;save()},
   file:el=>{const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#paste').value=r.result;toast('File loaded. Tap Import draws.')};r.readAsText(f)}
 };
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(el&&ACT[el.dataset.act])ACT[el.dataset.act](el,e)});
 document.addEventListener('change',e=>{const el=e.target.closest('[data-chg]');if(el&&CHG[el.dataset.chg])CHG[el.dataset.chg](el,e)});
-document.addEventListener('input',e=>{if(e.target.dataset.inp==='synPrize'){S.syn.prize=Math.max(0,+e.target.value||0);save();const pot=S.syn.members.reduce((a,m)=>a+(Number(m.paid)||0),0);
-  document.querySelectorAll('.syn-get').forEach((el,i)=>{const m=S.syn.members[i];el.textContent=((pot?(Number(m.paid)||0)/pot:0)*S.syn.prize).toFixed(2)})}});
 
 /* ================= start ================= */
 load();if(!S.draws.length)loadSample();render(false);

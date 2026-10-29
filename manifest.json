@@ -2,7 +2,7 @@
   "id": "/lottery-draw-lab/",
   "name": "Lottery Draw Lab",
   "short_name": "Draw Lab",
-  "description": "The honest lottery app: real odds, strategies tested against chance, prize-sharing scores, ticket checker, budget tracker and syndicate splitter. Statistics only; draws cannot be predicted.",
+  "description": "Lottery statistics and probability: real odds, strategies tested against chance, number-set sampling, historical result comparison and a private spending log. Statistics only; draws cannot be predicted.",
   "start_url": "/lottery-draw-lab/",
   "scope": "/lottery-draw-lab/",
   "display": "standalone",
