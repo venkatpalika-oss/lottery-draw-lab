@@ -169,7 +169,35 @@ const S={game:'marksix',k:6,N:49,draws:[],source:'sample',win:100,warm:50,period
   syn:{name:'My syndicate',members:[{name:'You',paid:10}],prize:0},
   gen:{strategy:'random',count:5,avoid:true,tickets:[]},scoreRef:null};
 function save(){try{const o={...S,draws:S.source==='sample'?[]:S.draws};delete o.scoreRef;localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
-function load(){try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o)Object.assign(S,o,{scoreRef:null})}catch(e){}}
+/* rollback compatibility: read data written by newer versions without discarding anything.
+   Renames newer 'sets' back to 'tickets' (lossless; newer versions read either name), keeps unknown
+   fields (e.g. the newer spending log) untouched so they are written back on save, and keeps a copy of
+   unreadable or repaired data under KEY+'.backup' instead of overwriting it. */
+const isObj=x=>x&&typeof x==='object'&&!Array.isArray(x);
+const isSet=t=>Array.isArray(t)&&t.every(Number.isFinite);
+function compat(o){let fixed=false;
+  if('gen' in o){if(!isObj(o.gen)){delete o.gen;fixed=true}else{
+    if(!Array.isArray(o.gen.tickets)&&Array.isArray(o.gen.sets))o.gen.tickets=o.gen.sets;
+    if(Array.isArray(o.gen.tickets))delete o.gen.sets;else{o.gen.tickets=[];if('tickets' in o.gen)fixed=true}
+    const n=o.gen.tickets.length;o.gen.tickets=o.gen.tickets.filter(isSet);if(o.gen.tickets.length!==n)fixed=true;
+    o.gen={...S.gen,...o.gen}}}
+  if('groups' in o){if(!Array.isArray(o.groups)){delete o.groups;fixed=true}else{const n=o.groups.length;
+    o.groups=o.groups.filter(isObj).map(g=>{if(!Array.isArray(g.tickets)&&Array.isArray(g.sets))g.tickets=g.sets;
+      if(Array.isArray(g.tickets))delete g.sets;else{g.tickets=[];fixed=true}
+      const m=g.tickets.length;g.tickets=g.tickets.filter(isSet);if(g.tickets.length!==m)fixed=true;return g});
+    if(o.groups.length!==n)fixed=true}}
+  if('syn' in o&&!(isObj(o.syn)&&Array.isArray(o.syn.members)&&o.syn.members.length)){delete o.syn;fixed=true}
+  if('draws' in o&&!Array.isArray(o.draws)){delete o.draws;fixed=true}
+  for(const f of ['k','N','price','limit','win','warm','period'])if(f in o&&!Number.isFinite(o[f])){delete o[f];fixed=true}
+  if('game' in o&&!GAMES[o.game]){delete o.game;delete o.k;delete o.N;fixed=true}
+  if(!('price' in o)&&GAMES[o.game||S.game])o.price=GAMES[o.game||S.game].price;
+  return fixed}
+function backup(raw){try{if(!localStorage.getItem(KEY+'.backup'))localStorage.setItem(KEY+'.backup',raw)}catch(e){}}
+function load(){let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){return}if(!raw)return;let o;
+  try{o=JSON.parse(raw)}catch(e){backup(raw);return}
+  if(!isObj(o)){backup(raw);return}
+  try{if(compat(o))backup(raw);Object.assign(S,o,{scoreRef:null})}catch(e){backup(raw)}}
+const groupCost=g=>Number.isFinite(g.price)?g.tickets.length*g.price:0;
 
 /* ================= maths ================= */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -236,8 +264,8 @@ function lowerRisk(t){const{N,k}=S;if(N<=31)return t;const r=mulberry32((Date.no
 /* saved tickets & money */
 function myGroups(){return S.groups.filter(g=>g.game===S.game)}
 function resolve(g){const i=S.draws.findIndex(d=>drawKey(d)===g.after);if(g.after===''&&S.draws.length)return{state:'unknown'};if(i<0)return{state:'unknown'};const d=S.draws[i+1];return d?{state:'done',draw:d}:{state:'pending'}}
-function monthSpend(){const now=new Date();return S.groups.filter(g=>{const c=new Date(g.created);return c.getFullYear()===now.getFullYear()&&c.getMonth()===now.getMonth()}).reduce((a,g)=>a+g.tickets.length*g.price,0)}
-function yearTotals(){const y=new Date().getFullYear();let spent=0,won=0;S.groups.forEach(g=>{if(new Date(g.created).getFullYear()===y){spent+=g.tickets.length*g.price;won+=Number(g.won)||0}});return{spent,won}}
+function monthSpend(){const now=new Date();return S.groups.filter(g=>{const c=new Date(g.created);return c.getFullYear()===now.getFullYear()&&c.getMonth()===now.getMonth()}).reduce((a,g)=>a+groupCost(g),0)}
+function yearTotals(){const y=new Date().getFullYear();let spent=0,won=0;S.groups.forEach(g=>{if(new Date(g.created).getFullYear()===y){spent+=groupCost(g);won+=Number(g.won)||0}});return{spent,won}}
 function myRecord(){let checked=0,lost=0,hit=0;myGroups().forEach(g=>{const r=resolve(g);if(r.state!=='done')return;g.tickets.forEach(t=>{checked++;const m=t.filter(x=>r.draw.nums.includes(x)).length;if(m>=3)hit++;else lost++})});return{checked,lost,hit}}
 
 /* ================= screens ================= */
@@ -379,14 +407,14 @@ function vOutcomes(){const{k,N}=S;let p3=0;for(let m=3;m<=k;m++)p3+=hyper(m,k,N)
 
 function vBudget(){const sp=monthSpend();const pct=S.limit>0?Math.min(100,sp/S.limit*100):0;const yt=yearTotals();const net=yt.won-yt.spent;
   const now=new Date();const reset=new Date(now.getFullYear(),now.getMonth()+1,1).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
-  const entries=S.groups.slice().reverse().slice(0,8);
+  const entries=S.groups.slice().reverse().slice(0,8);const kept=Array.isArray(S.log)?S.log.length:0;
   return topBar('Budget','Spending against prizes',{back:'home'})+`<main>
   <section class="hero">${ICON.ring}<div class="between"><span class="eyebrow">${now.toLocaleDateString('en-GB',{month:'long'})} limit</span><span class="mono soft" style="font-size:13px">${money(S.limit)}</span></div>
     <div class="row" style="align-items:baseline;gap:8px"><span class="big" style="font-size:34px">${money(sp)}</span><span class="soft">spent</span></div>
     <div class="progress" role="img" aria-label="${Math.round(pct)} percent of the monthly limit used"><div style="width:${pct}%;${pct>=100?'background:#ffd6d8':''}"></div></div>
     <span style="font-size:13.5px">${sp>=S.limit?'Limit reached':money(S.limit-sp)+' left'} · resets ${reset}</span></section>
   <section class="tiles"><div class="tile"><span class="k">Spent ${now.getFullYear()}</span><span class="v">${yt.spent.toLocaleString()}</span></div><div class="tile"><span class="k">Won ${now.getFullYear()}</span><span class="v" style="color:#4fd38c">${yt.won.toLocaleString()}</span></div><div class="tile"><span class="k">Net</span><span class="v" style="color:${net<0?'#ff8a90':'#4fd38c'}">${net<0?'−':''}${Math.abs(net).toLocaleString()}</span></div></section>
-  <section class="card flush"><div class="list">${entries.length?entries.map(g=>{const r=resolve(g);return `<div class="item"><div class="t"><span>${new Date(g.created).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${GAMES[g.game]?.name||''}</span><span class="s">${g.tickets.length} tickets · ${r.state==='done'?'checked':'waiting for result'}</span></div><span class="mono">−${(g.tickets.length*g.price).toLocaleString()}${Number(g.won)?` <span style="color:#4fd38c">+${Number(g.won).toLocaleString()}</span>`:''}</span></div>`}).join(''):'<div class="item"><span class="sub">Saved tickets appear here with their cost.</span></div>'}</div></section>
+  <section class="card flush"><div class="list">${entries.length?entries.map(g=>{const r=resolve(g);return `<div class="item"><div class="t"><span>${new Date(g.created).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} · ${GAMES[g.game]?.name||''}</span><span class="s">${g.tickets.length} tickets · ${r.state==='done'?'checked':'waiting for result'}</span></div><span class="mono">${Number.isFinite(g.price)?'−'+groupCost(g).toLocaleString():'<span class="soft">cost not recorded</span>'}${Number(g.won)?` <span style="color:#4fd38c">+${Number(g.won).toLocaleString()}</span>`:''}</span></div>`}).join(''):'<div class="item"><span class="sub">Saved tickets appear here with their cost.</span></div>'}</div></section>${kept?`<p class="sub" style="padding:0 4px">${kept} spending entr${kept>1?'ies':'y'} from a newer version ${kept>1?'are':'is'} kept on this device and will show again after the app updates.</p>`:''}
   <section class="card"><h2>Settings</h2>
     <div class="grid2"><label class="field">Monthly limit<input id="limit" type="number" min="0" step="any" value="${S.limit}" data-chg="limit"></label><label class="field">Ticket price<input id="price" type="number" min="0" step="any" value="${S.price}" data-chg="price"></label></div>
     <label class="field">Currency<input id="cur" type="text" maxlength="4" value="${esc(S.cur)}" data-chg="cur"></label>
@@ -422,7 +450,8 @@ function vData(){const last=S.draws.slice(-15).reverse();return topBar('Draw his
 const VIEWS={home:vHome,insights:vInsights,test:vTest,tickets:vTickets,score:vScore,checker:vChecker,outcomes:vOutcomes,budget:vBudget,syndicate:vSyndicate,data:vData};
 const PARENT={score:'tickets',checker:'tickets',outcomes:'home',budget:'home',syndicate:'home',data:'home'};
 let current='home';
-function render(keepScroll){const h=location.hash.slice(1);current=VIEWS[h]?h:'home';const y=window.scrollY;
+const NEWER={sets:'tickets',compare:'checker'};
+function render(keepScroll){if(NEWER[location.hash.slice(1)])history.replaceState(null,'','#'+NEWER[location.hash.slice(1)]);const h=location.hash.slice(1);current=VIEWS[h]?h:'home';const y=window.scrollY;
   $('#screen').innerHTML=VIEWS[current]();const tab=PARENT[current]||current;
   document.querySelectorAll('#tabs a').forEach(a=>a.setAttribute('aria-current',a.dataset.tab===tab?'page':'false'));
   window.scrollTo(0,keepScroll?y:0)}
