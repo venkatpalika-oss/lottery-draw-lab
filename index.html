@@ -167,14 +167,63 @@ const KEY='drawlab2';
 const S={game:'marksix',k:6,N:49,draws:[],source:'sample',win:100,warm:50,period:100,
   groups:[],cur:'HK$',limit:200,remind:true,log:[],
   gen:{strategy:'random',count:5,avoid:true,sets:[]},scoreRef:null};
-function save(){try{const o={...S,draws:S.source==='sample'?[]:S.draws};delete o.scoreRef;localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
+function serial(){const o={...S,draws:S.source==='sample'?[]:S.draws};delete o.scoreRef;return JSON.stringify(o)}
+function save(){try{localStorage.setItem(KEY,serial())}catch(e){}}
 /* v1 migration: drop the removed syndicate data and ticket pricing, rename tickets to number sets,
    and detach saved sets from any spending or prize figures */
 function migrate(o){if(!o||typeof o!=='object')return o;delete o.syn;delete o.price;delete o.pauseOver;
   if(o.gen){if(o.gen.tickets&&!o.gen.sets)o.gen.sets=o.gen.tickets;delete o.gen.tickets}
   if(Array.isArray(o.groups))o.groups=o.groups.map(g=>({id:g.id,game:g.game,after:g.after,created:g.created,sets:g.sets||g.tickets||[]}));
   if(!Array.isArray(o.log))o.log=[];return o}
-function load(){try{const o=migrate(JSON.parse(localStorage.getItem(KEY)||'null'));if(o){Object.assign(S,o,{scoreRef:null});save()}}catch(e){}}
+/* Tolerant reader (same approach as rollback/v0.9-compat). Malformed or incomplete stored data is repaired
+   field by field: valid number sets, spending entries and settings are kept; only values that cannot be used
+   are replaced by defaults. Before anything is repaired, the original text is copied to a backup key.
+   Backups are never overwritten or deleted: the first goes to KEY+'.backup' (the key the rollback build also
+   uses); later, different originals go to KEY+'.backup.<time>', at most 5. Valid data is never rewritten. */
+const isObj=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+const isSetOf=(t,k,N)=>Array.isArray(t)&&t.length===k&&t.every(x=>Number.isInteger(x)&&x>=1&&x<=N)&&new Set(t).size===k;
+const isSet=t=>Array.isArray(t)&&t.length>0&&t.every(x=>Number.isInteger(x)&&x>=1);
+function repair(o){let fixed=false;const drop=k=>{if(k in o){delete o[k];fixed=true}};
+  if('game' in o&&!GAMES[o.game]){drop('game');delete o.k;delete o.N}
+  const G=GAMES[o.game]||GAMES[S.game];
+  if(('k' in o&&o.k!==G.k)||('N' in o&&o.N!==G.N))fixed=true;o.k=G.k;o.N=G.N;
+  if('draws' in o){if(!Array.isArray(o.draws))drop('draws');else{const n=o.draws.length;
+    o.draws=o.draws.filter(d=>isObj(d)&&typeof d.date==='string'&&isSetOf(d.nums,G.k,G.N));if(o.draws.length!==n)fixed=true}}
+  if('source' in o&&!['sample','import','mixed'].includes(o.source))drop('source');
+  if(o.draws&&!o.draws.length&&o.source&&o.source!=='sample'){o.source='sample';fixed=true}
+  for(const f of ['win','warm','period','limit'])if(f in o&&!(Number.isFinite(o[f])&&o[f]>=0))drop(f);
+  if('cur' in o&&typeof o.cur!=='string')drop('cur');
+  if('remind' in o&&typeof o.remind!=='boolean')drop('remind');
+  if('gen' in o){if(!isObj(o.gen))drop('gen');else{const g=o.gen,n0=JSON.stringify(g);
+    if(!STRATS.some(x=>x.id===g.strategy))delete g.strategy;
+    if(!(Number.isInteger(g.count)&&g.count>=1&&g.count<=10))delete g.count;
+    if(typeof g.avoid!=='boolean')delete g.avoid;
+    for(const f of ['sets','tickets'])if(f in g)g[f]=Array.isArray(g[f])?g[f].filter(t=>isSetOf(t,G.k,G.N)):[];
+    if(JSON.stringify(g)!==n0)fixed=true;
+    if(!Array.isArray(g.sets)&&Array.isArray(g.tickets))g.sets=g.tickets;delete g.tickets;o.gen={...S.gen,...g}}}
+  if('groups' in o){if(!Array.isArray(o.groups))drop('groups');else{const n=o.groups.length;
+    o.groups=o.groups.map((g,i)=>{if(!isObj(g))return null;const has=Array.isArray(g.sets)?'sets':Array.isArray(g.tickets)?'tickets':null;
+      const src=has?g[has]:[],K=GAMES[g.game]?.k,M=GAMES[g.game]?.N,ok=src.filter(t=>K?isSetOf(t,K,M):isSet(t));
+      if(!has||ok.length!==src.length)fixed=true;g[has||'sets']=ok;
+      if(typeof g.id!=='string'||!g.id){g.id='r'+i;fixed=true}
+      for(const f of ['game','after'])if(typeof g[f]!=='string'){g[f]='';fixed=true}
+      return g}).filter(Boolean);if(o.groups.length!==n)fixed=true}}
+  if('log' in o){if(!Array.isArray(o.log))drop('log');else{const n=o.log.length;
+    o.log=o.log.map((e,i)=>{if(!(isObj(e)&&typeof e.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(e.date)&&Number.isFinite(Number(e.spent))&&Number(e.spent)>=0
+      &&(e.won==null||e.won===''||(Number.isFinite(Number(e.won))&&Number(e.won)>=0))))return null;
+      if(typeof e.id!=='string'||!e.id){fixed=true;return{...e,id:'r'+i}}return e}).filter(Boolean);
+    if(o.log.length!==n)fixed=true}}
+  return fixed}
+function backup(raw){try{const B=KEY+'.backup',ex=Object.keys(localStorage).filter(k=>k===B||k.startsWith(B+'.'));
+  if(ex.some(k=>localStorage.getItem(k)===raw))return;
+  if(!ex.includes(B))localStorage.setItem(B,raw);else if(ex.length<6)localStorage.setItem(B+'.'+new Date().toISOString(),raw)}catch(e){}}
+function load(){let raw=null;try{raw=localStorage.getItem(KEY)}catch(e){return}if(!raw)return;let o;
+  try{o=JSON.parse(raw)}catch(e){backup(raw);return}
+  if(!isObj(o)){backup(raw);return}
+  try{if(repair(o))backup(raw);migrate(o);Object.assign(S,o,{scoreRef:null})}catch(e){backup(raw);return}
+  if(!same(JSON.parse(serial()),JSON.parse(raw)))save()}
+function same(a,b){if(a===b)return true;if(typeof a!=='object'||typeof b!=='object'||!a||!b||Array.isArray(a)!==Array.isArray(b))return false;
+  const ka=Object.keys(a),kb=Object.keys(b);return ka.length===kb.length&&ka.every(k=>Object.prototype.hasOwnProperty.call(b,k)&&same(a[k],b[k]))}
 
 /* ================= maths ================= */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
