@@ -17,7 +17,7 @@ OLD, V1, RB = (sys.argv[1:4] + [None] * 3)[:3]
 OLD, V1, RB = OLD or "29409dc", V1 or "HEAD", RB or "dbf4d320d9938723ec8c967bd4334abfcaec2eb9"
 SHA = {n: subprocess.run(["git", "-C", REPO, "rev-parse", r], capture_output=True, text=True, check=True).stdout.strip()
        for n, r in (("old", OLD), ("v1", V1), ("rb", RB))}
-CACHE = {"old": "drawlab-v6", "v1": "drawlab-v8", "rb": "drawlab-v9"}
+CACHE = {"old": "drawlab-v6", "v1": "drawlab-v10", "rb": "drawlab-v9"}
 SCREENS = {"old": ["home", "insights", "test", "tickets", "score", "checker", "outcomes", "budget", "syndicate", "data"],
            "rb": ["home", "insights", "test", "tickets", "score", "checker", "outcomes", "budget", "syndicate", "data"],
            "v1": ["home", "insights", "test", "sets", "score", "compare", "outcomes", "budget", "data"]}

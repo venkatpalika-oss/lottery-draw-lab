@@ -19,6 +19,7 @@ Lottery draws are independent random events. The backtest exists to show that no
 
 ## Tests
 Run `python3 tests/run_tests.py` (needs Python Playwright with Chromium). It checks the maths, every screen in a headless browser, offline caching and the v1 policy rules.
+`tests/storage_tests.py` covers damaged saved data, `tests/rollback_scenarios.py` covers upgrades and the rollback build, and `tests/sw_tests.py` covers the offline cache under GitHub Pages-style browser caching.
 
 ## History
 The Syndicate Splitter was removed in v1 to reduce Google Play gambling-policy risk. The last version that included it is tagged `v0.9-with-syndicate`.
